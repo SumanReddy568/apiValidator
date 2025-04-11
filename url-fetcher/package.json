@@ -1,6 +1,6 @@
 {
   "name": "@sumanreddy/url-fetcher",
-  "version": "1.0.2",
+  "version": "1.0.5",
   "description": "A simple URL fetcher library",
   "main": "./src/index.js",
   "type": "module",

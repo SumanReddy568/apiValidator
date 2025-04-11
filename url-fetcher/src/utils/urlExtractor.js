@@ -8,24 +8,40 @@ import { logger } from "./logger.js";
 import { settings } from "../config/settings.js";
 import fs from "fs";
 import path from "path";
+import os from "os"; // Use ES module import for "os"
 
-// File to persist previously extracted URLs
-const extractedUrlsFile = path.resolve("./extractedUrls.json");
+// File to persist previously extracted domains
+const hiddenDir = path.join(os.homedir(), ".url-fetcher"); 
+const extractedDomainsFile = path.join(hiddenDir, "extractedDomains.json");
 
-// Load previously extracted URLs
-let previouslyExtractedUrls = new Set();
-if (fs.existsSync(extractedUrlsFile)) {
-  previouslyExtractedUrls = new Set(
-    JSON.parse(fs.readFileSync(extractedUrlsFile, "utf-8"))
-  );
+// Ensure the hidden directory exists
+function ensureStorageDirectory() {
+  if (!fs.existsSync(hiddenDir)) {
+    fs.mkdirSync(hiddenDir, { recursive: true });
+  }
 }
 
-// Save extracted URLs to file
-function saveExtractedUrls(urls) {
+// Load previously extracted domains
+let previouslyExtractedDomains = new Set();
+function loadExtractedDomains() {
+  ensureStorageDirectory();
+  if (fs.existsSync(extractedDomainsFile)) {
+    previouslyExtractedDomains = new Set(
+      JSON.parse(fs.readFileSync(extractedDomainsFile, "utf-8"))
+    );
+  }
+  return previouslyExtractedDomains;
+}
+
+// Save extracted domains to file
+function saveExtractedDomains(domains) {
+  ensureStorageDirectory();
+  const allDomains = new Set([...loadExtractedDomains(), ...domains]);
   fs.writeFileSync(
-    extractedUrlsFile,
-    JSON.stringify(Array.from(urls), null, 2)
+    extractedDomainsFile,
+    JSON.stringify(Array.from(allDomains), null, 2)
   );
+  previouslyExtractedDomains = allDomains; // Update in-memory set
 }
 
 // Utility to generate random delay
@@ -66,6 +82,18 @@ function updateDomainScore(domain, success) {
   return priority;
 }
 
+// Fetch domains without duplicates
+export async function fetchDomains(domainProvider) {
+  const fetchedDomains = loadExtractedDomains();
+  const newDomains = await domainProvider(); // Assume this function provides new domains
+
+  const uniqueDomains = newDomains.filter(
+    (domain) => !fetchedDomains.has(domain)
+  );
+  saveExtractedDomains(uniqueDomains);
+  return uniqueDomains;
+}
+
 // Main URL extraction function
 export async function getValidUrls(
   customFetch,
@@ -89,8 +117,7 @@ export async function getValidUrls(
 
     for (const url of urls) {
       const domain = getDomain(url);
-      if (!domain || domains.has(domain) || previouslyExtractedUrls.has(url))
-        continue;
+      if (!domain || previouslyExtractedDomains.has(domain)) continue;
 
       if (!domainGroups.has(domain)) {
         domainGroups.set(domain, []);
@@ -323,30 +350,35 @@ export async function getValidUrls(
     }
 
     // Process the URL
-    if (await isValidUrl(url)) {
-      validUrls.add(url);
-      domains.add(domain);
-      updateDomainScore(domain, true);
+    try {
+      if (await isValidUrl(url)) {
+        validUrls.add(url);
+        domains.add(domain);
+        updateDomainScore(domain, true);
 
-      // Aggressive domain switching
-      if (shouldSwitchDomain(domain)) {
-        processedDomains.add(domain);
-        return;
+        // Aggressive domain switching
+        if (shouldSwitchDomain(domain)) {
+          processedDomains.add(domain);
+          return;
+        }
+
+        if (validUrls.size < numUrls && depth < settings.maxDepth) {
+          const newUrls = await extractUrlsFromPage(url, depth);
+          const worthCrawling = newUrls.filter(
+            (newUrl) =>
+              !previouslyExtractedDomains.has(getDomain(newUrl)) &&
+              !visited.has(newUrl) &&
+              isValidUrlFormat(newUrl)
+          );
+
+          enqueueUrls(worthCrawling, 10 - depth, depth + 1);
+        }
+      } else {
+        updateDomainScore(domain, false);
       }
-
-      if (validUrls.size < numUrls && depth < settings.maxDepth) {
-        const newUrls = await extractUrlsFromPage(url, depth);
-        const worthCrawling = newUrls.filter(
-          (newUrl) =>
-            !previouslyExtractedUrls.has(newUrl) &&
-            !visited.has(newUrl) &&
-            isValidUrlFormat(newUrl)
-        );
-
-        enqueueUrls(worthCrawling, 10 - depth, depth + 1);
-      }
-    } else {
-      updateDomainScore(domain, false);
+    } catch (error) {
+      // Suppress errors and log internally
+      logger.debug(`Error processing URL ${url}: ${error.message}`);
     }
   }
 
@@ -394,9 +426,9 @@ export async function getValidUrls(
   // Process the queue
   await processQueue();
 
-  // Save extracted URLs for future runs
-  const allExtractedUrls = new Set([...previouslyExtractedUrls, ...validUrls]);
-  saveExtractedUrls(allExtractedUrls);
+  // Save extracted domains for future runs
+  saveExtractedDomains(domains);
 
+  // Ensure the exact number of URLs is returned
   return Array.from(validUrls).slice(0, numUrls);
 }
