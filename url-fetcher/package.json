@@ -1,11 +1,12 @@
 {
   "name": "@sumanreddy/url-fetcher",
-  "version": "1.0.0",
+  "version": "1.0.2",
   "description": "A simple URL fetcher library",
-  "main": "index.js",
+  "main": "./src/index.js",
   "type": "module",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "node test/test.js",
+    "start": "node src/index.js"
   },
   "keywords": [
     "url",
@@ -20,7 +21,9 @@
     "jsdom": "^22.1.0",
     "node-fetch": "^3.3.2"
   },
-  "devDependencies": {},
+  "devDependencies": {
+    "jest": "^29.0.0"
+  },
   "repository": {
     "type": "git",
     "url": "https://github.com/SumanReddy18/url-fetcher.git"
@@ -31,5 +34,8 @@
   "homepage": "https://github.com/SumanReddy18/url-fetcher#readme",
   "publishConfig": {
     "access": "public"
+  },
+  "exports": {
+    ".": "./src/index.js"
   }
 }

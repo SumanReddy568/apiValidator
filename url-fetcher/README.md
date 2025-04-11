@@ -1,20 +1,37 @@
-# URL Fetcher
+# @sumanreddy/url-fetcher
 
-A Node.js application that crawls the web to fetch and validate webpage URLs.
-
-## Features
-
-- Fetches a specified number of valid webpage URLs
-- Validates URLs before including them
-- Respects robots.txt and implements polite crawling
-- Configurable crawling settings
-- Comprehensive logging
-- Error handling
-- Test suite included
+A powerful URL fetcher and crawler library that discovers and extracts valid URLs from the web.
 
 ## Installation
 
-1. Clone the repository:
 ```bash
-git clone https://github.com/SumanReddy18/url-fetcher.git
-cd url-fetcher
+npm install @sumanreddy/url-fetcher
+```
+
+## Usage
+
+```javascript
+import { fetchUrls } from "@sumanreddy/url-fetcher";
+
+// Fetch 10 URLs
+const urls = await fetchUrls(10);
+console.log(urls);
+
+// Fetch default number of URLs
+const moreUrls = await fetchUrls();
+console.log(moreUrls);
+```
+
+## CLI Usage
+
+```bash
+node src/index.js 5  # Fetch 5 URLs
+```
+
+## Features
+
+- Configurable URL count
+- Smart crawling with retry mechanism
+- Domain diversity control
+- Bot detection avoidance
+- Respects robots.txt and site policies

@@ -1,7 +1,72 @@
-import { isValidUrl, isValidUrlFormat } from "./urlValidator.js";
+import {
+  isValidUrl,
+  isValidUrlFormat,
+  normalizeUrl,
+  isWorthCrawling,
+} from "./urlValidator.js";
 import { logger } from "./logger.js";
 import { settings } from "../config/settings.js";
+import fs from "fs";
+import path from "path";
 
+// File to persist previously extracted URLs
+const extractedUrlsFile = path.resolve("./extractedUrls.json");
+
+// Load previously extracted URLs
+let previouslyExtractedUrls = new Set();
+if (fs.existsSync(extractedUrlsFile)) {
+  previouslyExtractedUrls = new Set(
+    JSON.parse(fs.readFileSync(extractedUrlsFile, "utf-8"))
+  );
+}
+
+// Save extracted URLs to file
+function saveExtractedUrls(urls) {
+  fs.writeFileSync(
+    extractedUrlsFile,
+    JSON.stringify(Array.from(urls), null, 2)
+  );
+}
+
+// Utility to generate random delay
+function randomDelay(min, max) {
+  return Math.floor(Math.random() * (max - min + 1) + min);
+}
+
+// Get random referer from our valid URLs or seed URLs
+function getRandomReferer(validUrls) {
+  const refererPool = [...Array.from(validUrls), ...settings.seedUrls];
+  const randomIndex = Math.floor(Math.random() * refererPool.length);
+  return refererPool[randomIndex] || "https://www.google.com/";
+}
+
+// Extract domain from URL
+function getDomain(url) {
+  try {
+    return new URL(url).hostname;
+  } catch {
+    return null;
+  }
+}
+
+// Add new utility functions at the top
+const processedDomains = new Set();
+const domainUrlCounts = new Map();
+const domainPriorities = new Map();
+
+function shouldSwitchDomain(domain) {
+  const urlCount = domainUrlCounts.get(domain) || 0;
+  return urlCount >= Math.min(5, settings.maxUrlsPerDomain / 2);
+}
+
+function updateDomainScore(domain, success) {
+  let priority = domainPriorities.get(domain) || 1.0;
+  priority = success ? priority * 1.2 : priority * 0.8;
+  domainPriorities.set(domain, priority);
+  return priority;
+}
+
+// Main URL extraction function
 export async function getValidUrls(
   customFetch,
   customJSDOM,
@@ -10,178 +75,328 @@ export async function getValidUrls(
   const validUrls = new Set();
   const visited = new Set();
   const domains = new Set();
+  const urlQueue = [];
+  const domainLastAccessed = new Map();
 
-  // Function to extract domain from URL
-  function getDomain(url) {
+  // Add new Set for tracking current batch domains
+  const currentBatchDomains = new Set();
+
+  // Modified enqueueUrls function
+  function enqueueUrls(urls, priority = 0, currentDepth = 0) {
+    if (!Array.isArray(urls)) return;
+
+    const domainGroups = new Map();
+
+    for (const url of urls) {
+      const domain = getDomain(url);
+      if (!domain || domains.has(domain) || previouslyExtractedUrls.has(url))
+        continue;
+
+      if (!domainGroups.has(domain)) {
+        domainGroups.set(domain, []);
+      }
+      domainGroups.get(domain).push(url);
+    }
+
+    for (const [domain, domainUrls] of domainGroups) {
+      const selectedUrls = domainUrls
+        .sort(() => Math.random() - 0.5)
+        .slice(0, 3);
+
+      for (const url of selectedUrls) {
+        const urlPriority = priority + Math.random() * 5;
+
+        urlQueue.push({
+          url,
+          priority: urlPriority,
+          depth: currentDepth,
+          domain,
+        });
+      }
+    }
+
+    urlQueue.sort((a, b) => b.priority - a.priority);
+  }
+
+  // Extract sitemap URLs from a website
+  async function extractSitemapUrls(domain) {
+    if (!settings.enableSitemapDiscovery) return [];
+
     try {
-      return new URL(url).hostname;
-    } catch {
-      return null;
+      const sitemapUrl = `https://${domain}/sitemap.xml`;
+      const response = await customFetch(sitemapUrl, {
+        headers: settings.headers,
+        timeout: settings.timeout,
+      });
+
+      if (!response.ok) return [];
+
+      const content = await response.text();
+      const dom = new customJSDOM(content);
+      const locs = dom.window.document.querySelectorAll("loc");
+
+      return Array.from(locs)
+        .map((loc) => loc.textContent)
+        .filter(isValidUrlFormat);
+    } catch (error) {
+      return [];
     }
   }
 
-  // Add this function at the top of the file
-  function isNewDomain(url, existingUrls) {
-    const domain = getDomain(url);
-    return !Array.from(existingUrls).some(
-      (existing) => getDomain(existing) === domain
-    );
-  }
+  // Extract URLs from robots.txt
+  async function extractRobotsTxtUrls(domain) {
+    if (!settings.checkRobotsTxt) return [];
 
-  // Modify the extractUrlsFromPage function
-  async function extractUrlsFromPage(url) {
     try {
-      const response = await customFetch(url, {
-        headers: {
-          ...settings.headers,
-          Accept:
-            "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
-          "User-Agent": "Mozilla/5.0 (compatible; URL-Fetcher/1.0;)",
-        },
-        timeout: 5000, // reduced timeout for faster extraction
-        redirect: "follow",
-        follow: 3, // reduced redirects for speed
+      const robotsUrl = `https://${domain}/robots.txt`;
+      const response = await customFetch(robotsUrl, {
+        headers: settings.headers,
+        timeout: settings.timeout / 2,
       });
 
+      if (!response.ok) return [];
+
+      const content = await response.text();
+      const sitemapMatches = content.match(/Sitemap:\s*(.+)/gi);
+
+      if (!sitemapMatches) return [];
+
+      return sitemapMatches
+        .map((match) => {
+          const url = match.replace(/Sitemap:\s*/i, "").trim();
+          return url;
+        })
+        .filter(isValidUrlFormat);
+    } catch (error) {
+      return [];
+    }
+  }
+
+  // Enhanced URL extraction with better link finding
+  async function extractUrlsFromPage(url, depth = 0) {
+    if (depth > settings.maxDepth) return [];
+
+    try {
+      const headers = { ...settings.headers };
+
+      // Use random referer to appear more natural
+      if (settings.useRandomReferer && validUrls.size > 0) {
+        headers["Referer"] = getRandomReferer(validUrls);
+      }
+
+      const response = await customFetch(url, {
+        headers,
+        timeout: settings.timeout,
+        redirect: "follow",
+        follow: settings.maxRedirects || 3,
+      });
+
+      if (!response.ok) return [];
+
+      const contentType = response.headers.get("content-type");
       if (
-        !response.ok ||
-        !settings.allowedContentTypes.includes(
-          response.headers.get("content-type")?.split(";")[0]
+        !contentType ||
+        !settings.allowedContentTypes.some((type) =>
+          contentType.toLowerCase().includes(type.toLowerCase())
         )
       ) {
         return [];
       }
 
       const html = await response.text();
+
+      // Very basic check for content size
+      if (html.length < settings.minContentLength) {
+        return [];
+      }
+
       const dom = new customJSDOM(html);
-      return [
-        ...new Set([
-          ...Array.from(dom.window.document.querySelectorAll("a[href]")),
-          ...Array.from(dom.window.document.querySelectorAll("link[href]")),
-        ]),
-      ]
-        .map((link) => {
-          try {
-            return new URL(link.href, url).toString();
-          } catch {
-            return null;
+      const document = dom.window.document;
+
+      // Skip pages with captchas, logins, or minimal content
+      const textContent = document.body ? document.body.textContent : "";
+      if (
+        textContent.includes("captcha") ||
+        (textContent.includes("robot") && textContent.includes("check")) ||
+        document.querySelectorAll('input[type="password"]').length > 0
+      ) {
+        return [];
+      }
+
+      // Check text to HTML ratio
+      const textRatio = textContent.length / html.length;
+      if (textRatio < settings.minTextContentRatio) {
+        return [];
+      }
+
+      // Collect URLs from various sources
+      const foundUrls = new Set();
+
+      // 1. Standard links
+      const links = document.querySelectorAll("a[href]");
+      links.forEach((link) => {
+        try {
+          const href = link.getAttribute("href");
+          if (!href) return;
+
+          // Skip same-page anchors
+          if (href.startsWith("#")) return;
+
+          const absoluteUrl = new URL(href, url).toString();
+          foundUrls.add(absoluteUrl);
+        } catch {}
+      });
+
+      // 2. Check canonical links
+      const canonicals = document.querySelectorAll('link[rel="canonical"]');
+      canonicals.forEach((link) => {
+        try {
+          const href = link.getAttribute("href");
+          if (href) {
+            const absoluteUrl = new URL(href, url).toString();
+            foundUrls.add(absoluteUrl);
           }
-        })
-        .filter((link) => link && isValidUrl(link)); // Use isValidUrl here
+        } catch {}
+      });
+
+      // 3. Alternate links
+      const alternates = document.querySelectorAll('link[rel="alternate"]');
+      alternates.forEach((link) => {
+        try {
+          const href = link.getAttribute("href");
+          if (href) {
+            const absoluteUrl = new URL(href, url).toString();
+            foundUrls.add(absoluteUrl);
+          }
+        } catch {}
+      });
+
+      // 4. Look for links in content (sometimes JavaScript-rendered content has URLs in text)
+      const textNodes = Array.from(
+        document.querySelectorAll("p, span, div")
+      ).map((el) => el.textContent);
+
+      const urlRegex = /(https?:\/\/[^\s"'>]+)/g;
+      textNodes.forEach((text) => {
+        const matches = text.match(urlRegex);
+        if (matches) {
+          matches.forEach((match) => foundUrls.add(match));
+        }
+      });
+
+      // Filter and return valid URLs
+      return Array.from(foundUrls).filter(isValidUrlFormat);
     } catch (error) {
       logger.debug(`Failed to extract URLs from ${url}:`, error.message);
       return [];
     }
   }
 
-  // Rate limiting map
-  const domainLastAccessed = new Map();
+  // Modified crawl function
+  async function crawl(queueItem) {
+    const { url, depth, domain } = queueItem;
 
-  async function crawl(startUrl) {
-    if (validUrls.size >= numUrls || visited.has(startUrl)) {
+    if (validUrls.size >= numUrls || visited.has(url)) return;
+
+    // Skip if domain is overused
+    if (shouldSwitchDomain(domain)) {
+      processedDomains.add(domain);
       return;
     }
 
-    const domain = getDomain(startUrl);
-    const now = Date.now();
-    const lastAccessed = domainLastAccessed.get(domain) || 0;
+    visited.add(url);
+    currentBatchDomains.add(domain);
 
-    if (now - lastAccessed < settings.crawlDelay) {
-      // Use crawlDelay from settings
-      await new Promise((resolve) => setTimeout(resolve, settings.crawlDelay));
+    // Update domain URL count
+    domainUrlCounts.set(domain, (domainUrlCounts.get(domain) || 0) + 1);
+
+    // Respect crawl delay with some randomness
+    if (domain) {
+      const now = Date.now();
+      const lastAccessed = domainLastAccessed.get(domain) || 0;
+      const delay = settings.crawlDelay + randomDelay(0, 300);
+
+      if (now - lastAccessed < delay) {
+        await new Promise((resolve) => setTimeout(resolve, delay));
+      }
+      domainLastAccessed.set(domain, Date.now());
     }
-    domainLastAccessed.set(domain, now);
 
-    visited.add(startUrl);
+    // Process the URL
+    if (await isValidUrl(url)) {
+      validUrls.add(url);
+      domains.add(domain);
+      updateDomainScore(domain, true);
 
-    if (await isValidUrl(startUrl)) {
-      if (isNewDomain(startUrl, validUrls)) {
-        validUrls.add(startUrl);
-        domains.add(domain);
-        logger.info(`Found new domain: ${domain}`);
-      } else if (validUrls.size < numUrls) {
-        const urlsFromDomain = Array.from(validUrls).filter(
-          (url) => getDomain(url) === domain
-        ).length;
-        if (urlsFromDomain < settings.maxUrlsPerDomain) {
-          validUrls.add(startUrl);
-        }
+      // Aggressive domain switching
+      if (shouldSwitchDomain(domain)) {
+        processedDomains.add(domain);
+        return;
       }
 
-      if (validUrls.size < numUrls) {
-        const newUrls = await extractUrlsFromPage(startUrl);
-        const prioritizedUrls = newUrls
-          .filter((url) => !visited.has(url))
-          .sort(() => Math.random() - 0.5)
-          .slice(0, 10); // Limit URLs per page for faster processing
+      if (validUrls.size < numUrls && depth < settings.maxDepth) {
+        const newUrls = await extractUrlsFromPage(url, depth);
+        const worthCrawling = newUrls.filter(
+          (newUrl) =>
+            !previouslyExtractedUrls.has(newUrl) &&
+            !visited.has(newUrl) &&
+            isValidUrlFormat(newUrl)
+        );
 
-        await Promise.all(prioritizedUrls.map((url) => crawl(url)));
+        enqueueUrls(worthCrawling, 10 - depth, depth + 1);
       }
+    } else {
+      updateDomainScore(domain, false);
     }
   }
 
-  const diverseSeedUrls = [
-    "https://dmoz-odp.org",
-    "https://directory.google.com",
-    "https://curlie.org",
-    "https://botw.org",
+  // Use Promise.all with limited concurrency
+  const runningPromises = new Set();
 
-    // Web Archives
-    "https://web.archive.org",
-    "https://archive.is",
+  // Function to process the queue with limited concurrency
+  async function processQueue() {
+    const processStart = Date.now();
 
-    // Open Source
-    "https://opensource.org",
-    "https://sourceforge.net",
-    "https://gitlab.com/explore",
-    "https://github.com/explore",
+    while (
+      urlQueue.length > 0 &&
+      validUrls.size < numUrls &&
+      Date.now() - processStart < settings.timeout * 2
+    ) {
+      // Respect concurrency limit
+      if (runningPromises.size >= settings.concurrentRequests) {
+        await Promise.race(runningPromises);
+      }
 
-    // Academic
-    "https://arxiv.org",
-    "https://scholar.google.com",
-    "https://academia.edu",
-    "https://researchgate.net",
+      // Get next URL from queue
+      const queueItem = urlQueue.shift();
 
-    // Alternative Search Engines
-    "https://duckduckgo.com",
-    "https://qwant.com",
-    "https://swisscows.com",
+      // Skip if already visited
+      if (visited.has(queueItem.url)) {
+        continue;
+      }
 
-    // Tech and Science
-    "https://github.com",
-    "https://mozilla.org",
-    "https://wikipedia.org",
-    "https://stackoverflow.com",
-    // News and Media
-    "https://reuters.com",
-    "https://bbc.com",
-    "https://theguardian.com",
-    "https://nytimes.com",
-    // Education
-    "https://coursera.org",
-    "https://edx.org",
-    "https://mit.edu",
-    "https://stanford.edu",
-    // Business and Finance
-    "https://bloomberg.com",
-    "https://forbes.com",
-    "https://wsj.com",
-    // Technology News
-    "https://techcrunch.com",
-    "https://wired.com",
-    "https://arstechnica.com",
-    // General Interest
-    "https://reddit.com",
-    "https://medium.com",
-  ];
+      // Process URL
+      const promise = crawl(queueItem).finally(() => {
+        runningPromises.delete(promise);
+      });
 
-  // Process in parallel with higher concurrency
-  const concurrencyLimit = 10;
-  const shuffledSeeds = diverseSeedUrls.sort(() => Math.random() - 0.5);
+      runningPromises.add(promise);
+    }
 
-  await Promise.all(
-    shuffledSeeds.slice(0, concurrencyLimit).map((url) => crawl(url))
-  );
+    // Wait for remaining promises
+    await Promise.all(runningPromises);
+  }
+
+  // Initialize with shuffled seed URLs
+  const shuffledSeedUrls = settings.seedUrls.sort(() => Math.random() - 0.5);
+  enqueueUrls(shuffledSeedUrls, 10, 0);
+
+  // Process the queue
+  await processQueue();
+
+  // Save extracted URLs for future runs
+  const allExtractedUrls = new Set([...previouslyExtractedUrls, ...validUrls]);
+  saveExtractedUrls(allExtractedUrls);
 
   return Array.from(validUrls).slice(0, numUrls);
 }
