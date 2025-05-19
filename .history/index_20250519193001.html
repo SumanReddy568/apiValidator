@@ -170,21 +170,16 @@
                         <div class="tab-content">
                             <div class="tab-pane active" id="response-body">
                                 <div class="response-actions">
-                                    <div class="filter-container">
-                                        <div class="filter-group">
-                                            <label for="filter-type">Filter by:</label>
-                                            <select id="filter-type" class="filter-select">
-                                                <option value="">Select field...</option>
-                                            </select>
-                                            <select id="filter-operator" class="filter-select" style="display:none;">
-                                                <option value="match">equals</option>
-                                            </select>
-                                            <input type="text" id="filter-value" placeholder="Filter value" />
-                                            <button id="apply-filter" class="btn-secondary">Apply</button>
+                                    <div class="filter-actions">
+                                        <button id="show-filter-btn" class="btn-secondary" disabled>
+                                            <i class="fas fa-filter"></i> Filter
+                                        </button>
+                                        <div id="active-filters-container" class="active-filters">
+                                            <!-- Active filters will be displayed here -->
                                         </div>
-                                        <div class="active-filters" id="active-filters">
-                                            <!-- Active filters will be added here -->
-                                        </div>
+                                        <button id="clear-filters-btn" class="btn-secondary" style="display: none;">
+                                            Clear Filters
+                                        </button>
                                     </div>
                                     <div class="format-toggle">
                                         <button id="pretty-print" class="btn-icon active" title="Pretty print">
@@ -194,15 +189,15 @@
                                             <i class="fas fa-align-left"></i>
                                         </button>
                                     </div>
-                                    <div class="search-container">
-                                        <input type="text" class="search-input" id="response-search"
-                                            placeholder="Search in response...">
-                                        <span class="search-stats" id="search-stats"></span>
-                                        <button class="btn-icon" id="prev-match" title="Previous match"><i
-                                                class="fas fa-chevron-up"></i></button>
-                                        <button class="btn-icon" id="next-match" title="Next match"><i
-                                                class="fas fa-chevron-down"></i></button>
-                                    </div>
+                                </div>
+                                <div class="search-container">
+                                    <input type="text" class="search-input" id="response-search"
+                                        placeholder="Search in response...">
+                                    <span class="search-stats" id="search-stats"></span>
+                                    <button class="btn-icon" id="prev-match" title="Previous match"><i
+                                            class="fas fa-chevron-up"></i></button>
+                                    <button class="btn-icon" id="next-match" title="Next match"><i
+                                            class="fas fa-chevron-down"></i></button>
                                 </div>
                                 <div class="response-body-content">
                                     <pre id="response-data">No response yet. Send a request to see results.</pre>
@@ -278,6 +273,47 @@
             <div class="settings-modal-footer">
                 <button id="cancelSettingsBtn" class="btn-secondary">Cancel</button>
                 <button id="saveSettingsBtn" class="btn-primary">Save</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add the filter modal at the end before closing body tag -->
+    <div id="filter-modal-overlay" class="modal-overlay">
+        <div class="modal-content filter-modal">
+            <div class="modal-header">
+                <h2>Filter Response Data</h2>
+                <button id="close-filter-modal" class="btn-icon">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="filter-builder">
+                    <div class="filter-row">
+                        <div class="filter-field">
+                            <label for="filter-field-select">Field</label>
+                            <select id="filter-field-select" class="filter-select">
+                                <option value="">Select a field</option>
+                            </select>
+                        </div>
+                        <div class="filter-field">
+                            <label for="filter-operator-select">Operator</label>
+                            <select id="filter-operator-select" class="filter-select">
+                                <option value="equal">equals (=)</option>
+                                <option value="not_equal">not equal (≠)</option>
+                                <option value="contains">contains</option>
+                                <option value="greater">greater than (>)</option>
+                                <option value="less">less than (<)< /option>
+                            </select>
+                        </div>
+                        <div class="filter-field">
+                            <label for="filter-value-input">Value</label>
+                            <input type="text" id="filter-value-input" placeholder="Enter value..."
+                                list="filter-value-list">
+                            <datalist id="filter-value-list"></datalist>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-actions">
+                <button id="apply-filter-btn" class="btn-primary">Apply Filter</button>
             </div>
         </div>
     </div>

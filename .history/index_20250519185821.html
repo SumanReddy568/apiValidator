@@ -5,8 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>API Validator</title>
-    <link rel="icon" type="image/svg+xml"
-        href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 640 512'%3E%3Cpath fill='%234CAF50' d='M392.8 1.2c-17-4.9-34.7 5-39.6 22l-128 448c-4.9 17 5 34.7 22 39.6s34.7-5 39.6-22l128-448c4.9-17-5-34.7-22-39.6zm80.6 120.1c-12.5 12.5-12.5 32.8 0 45.3L562.7 256l-89.3 89.4c-12.5 12.5-12.5 32.8 0 45.3s32.8 12.5 45.3 0l112-112c12.5-12.5 12.5-32.8 0-45.3l-112-112c-12.5-12.5-32.8-12.5-45.3 0zm-306.7 0c-12.5-12.5-32.8-12.5-45.3 0l-112 112c-12.5 12.5-12.5 32.8 0 45.3l112 112c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L77.3 256l89.4-89.4c12.5-12.5 12.5-32.8 0-45.3z'/%3E%3C/svg%3E" />
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 640 512'%3E%3Cpath fill='%234CAF50' d='M392.8 1.2c-17-4.9-34.7 5-39.6 22l-128 448c-4.9 17 5 34.7 22 39.6s34.7-5 39.6-22l128-448c4.9-17-5-34.7-22-39.6zm80.6 120.1c-12.5 12.5-12.5 32.8 0 45.3L562.7 256l-89.3 89.4c-12.5 12.5-12.5 32.8 0 45.3s32.8 12.5 45.3 0l112-112c12.5-12.5 12.5-32.8 0-45.3l-112-112c-12.5-12.5-32.8-12.5-45.3 0zm-306.7 0c-12.5-12.5-32.8-12.5-45.3 0l-112 112c-12.5 12.5-12.5 32.8 0 45.3l112 112c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L77.3 256l89.4-89.4c12.5-12.5 12.5-32.8 0-45.3z'/%3E%3C/svg%3E"/>
     <link rel="stylesheet" href="styles.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -15,6 +14,9 @@
     <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
     <script type="module" src="styles.css"></script>
     <script type="module" src="js/app.js"></script>
+    <style>
+        
+    </style>
 </head>
 
 <body>
@@ -25,34 +27,33 @@
                 <h1>API Validator</h1>
             </div>
             <div class="header-actions">
-                <button id="docs-btn" class="btn-secondary">
-                    <i class="fas fa-book"></i> Docs
-                </button>
+                <div class="docs-dropdown">
+                    <button id="docs-btn" class="btn-secondary">
+                        <i class="fas fa-book"></i> Docs
+                    </button>
+                    <div class="docs-content">
+                        <div class="docs-section">
+                            <h3>Sample API Endpoints</h3>
+                            <ul class="api-list">
+                                <li><a href="https://restful-api.dev/" target="_blank">Restful API Dev</a></li>
+                                <li><a href="https://reqres.in/" target="_blank">ReqRes</a></li>
+                                <li><a href="https://fakeapi.platzi.com/" target="_blank">Platzi Fake Store API</a></li>
+                                <li><a href="https://fakestoreapi.com/docs" target="_blank">Fake Store API</a></li>
+                            </ul>
+                        </div>
+                        <div class="docs-section">
+                            <h3>Quick Test Endpoints</h3>
+                            <ul class="api-list">
+                                <li><a href="#" class="test-endpoint" data-url="https://api.restful-api.dev/objects">GET All Objects</a></li>
+                                <li><a href="#" class="test-endpoint" data-url="https://reqres.in/api/users">GET Users List</a></li>
+                                <li><a href="#" class="test-endpoint" data-url="https://fakestoreapi.com/products">GET Products</a></li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
                 <button id="settings-btn" class="btn-secondary">
                     <i class="fas fa-cog"></i> Settings
                 </button>
-                <div class="docs-content">
-                    <div class="docs-section">
-                        <h3>Sample API Endpoints</h3>
-                        <ul class="api-list">
-                            <li><a href="https://restful-api.dev/" target="_blank">Restful API Dev</a></li>
-                            <li><a href="https://reqres.in/" target="_blank">ReqRes</a></li>
-                            <li><a href="https://fakeapi.platzi.com/" target="_blank">Platzi Fake Store API</a></li>
-                            <li><a href="https://fakestoreapi.com/docs" target="_blank">Fake Store API</a></li>
-                        </ul>
-                    </div>
-                    <!-- <div class="docs-section">
-                        <h3>Quick Test Endpoints</h3>
-                        <ul class="api-list">
-                            <li><a href="#" class="test-endpoint" data-url="https://api.restful-api.dev/objects">GET All
-                                    Objects</a></li>
-                            <li><a href="#" class="test-endpoint" data-url="https://reqres.in/api/users">GET Users
-                                    List</a></li>
-                            <li><a href="#" class="test-endpoint" data-url="https://fakestoreapi.com/products">GET
-                                    Products</a></li>
-                        </ul>
-                    </div> -->
-                </div>
             </div>
         </header>
 

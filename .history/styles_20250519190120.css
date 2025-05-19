@@ -1168,14 +1168,13 @@ body.light-mode pre#response-data {
     position: absolute;
     top: 100%;
     right: 0;
-    background-color: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+    background-color: #fff;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
     z-index: 1000;
     min-width: 250px;
     margin-top: 5px;
-    backdrop-filter: blur(10px);
 }
 
 .docs-content.show {
@@ -1184,7 +1183,7 @@ body.light-mode pre#response-data {
 
 .docs-section {
     padding: 15px;
-    border-bottom: 1px solid var(--border);
+    border-bottom: 1px solid #333;
 }
 
 .docs-section:last-child {
@@ -1193,7 +1192,7 @@ body.light-mode pre#response-data {
 
 .docs-section h3 {
     margin: 0 0 10px 0;
-    color: var(--text-primary);
+    color: #e0e0e0;
     font-size: 14px;
 }
 
@@ -1208,15 +1207,13 @@ body.light-mode pre#response-data {
 }
 
 .api-list a {
-    color: var(--primary);
+    color: #64b5f6;
     text-decoration: none;
     font-size: 13px;
-    transition: color 0.2s ease;
 }
 
 .api-list a:hover {
-    color: var(--primary-light);
-    text-decoration: none;
+    text-decoration: underline;
 }
 
 /* Make preview content scrollable */
@@ -1326,11 +1323,4 @@ body.light-mode pre#response-data {
 .search-highlight.active {
     background-color: rgba(255, 160, 0, 0.5);
     border-bottom: 1px solid rgba(255, 160, 0, 0.9);
-}
-
-.header-actions {
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-    position: relative;
 }

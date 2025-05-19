@@ -470,10 +470,18 @@ textarea:focus {
 }
 
 .filter-group {
-    display: flex;
-    gap: 0.5rem;
+    display: grid;
+    grid-template-columns: auto minmax(100px, 1fr) minmax(120px, auto) 1fr auto;
+    gap: 8px;
     align-items: center;
-    flex-wrap: wrap;
+    padding: 8px;
+    background: var(--surface-light);
+    border-radius: 6px;
+    margin-bottom: 10px;
+}
+
+.filter-operator {
+    min-width: 120px;
 }
 
 .filter-group label {
@@ -494,19 +502,20 @@ textarea:focus {
 .active-filters {
     display: flex;
     flex-wrap: wrap;
-    gap: 0.5rem;
-    margin-top: 0.5rem;
+    gap: 6px;
+    margin-top: 8px;
 }
 
 .filter-tag {
-    background-color: var(--surface-light);
+    background: var(--surface-light);
     border: 1px solid var(--border);
     border-radius: 4px;
-    padding: 0.25rem 0.5rem;
+    padding: 4px 8px;
+    font-size: 0.9rem;
     display: flex;
     align-items: center;
-    gap: 0.5rem;
-    font-size: 0.9rem;
+    gap: 6px;
+    animation: fadeIn 0.2s ease;
 }
 
 .filter-tag .remove-filter {
@@ -1081,13 +1090,13 @@ body.light-mode pre#response-data {
 /* Updated Filter Styles */
 .filter-group {
     display: grid;
-    grid-template-columns: auto 1fr auto;
-    gap: 15px;
+    grid-template-columns: auto minmax(100px, 1fr) minmax(120px, auto) 1fr auto;
+    gap: 8px;
     align-items: center;
-    margin-bottom: 15px;
-    padding: 10px;
-    background: #252525;
+    padding: 8px;
+    background: var(--surface-light);
     border-radius: 6px;
+    margin-bottom: 10px;
 }
 
 .filter-select,

@@ -82,23 +82,19 @@ function initSettings() {
     }
 }
 
-// Handle docs dropdown
-document.addEventListener('DOMContentLoaded', function() {
-    const docsBtn = document.getElementById('docs-btn');
-    const docsContent = document.querySelector('.docs-content');
-    
-    if (docsBtn && docsContent) {
-        docsBtn.addEventListener('click', function(e) {
-            e.stopPropagation();
-            docsContent.classList.toggle('show');
-        });
-        
-        // Close dropdown when clicking outside
-        document.addEventListener('click', function(e) {
-            if (!docsContent.contains(e.target) && e.target !== docsBtn) {
-                docsContent.classList.remove('show');
-            }
-        });
+// Docs dropdown functionality
+const docsBtn = document.getElementById('docs-btn');
+const docsContent = document.querySelector('.docs-content');
+
+docsBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    docsContent.classList.toggle('show');
+});
+
+// Close dropdown when clicking outside
+document.addEventListener('click', (e) => {
+    if (!e.target.closest('.docs-dropdown')) {
+        docsContent.classList.remove('show');
     }
 });
 

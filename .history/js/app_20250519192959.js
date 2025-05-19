@@ -10,6 +10,7 @@ import { initCurlImport } from './features/curlImport.js';
 import { initSendRequest } from './features/sendRequest.js';
 import { initPreview } from './ui/preview.js';
 import { initSearch } from './ui/search.js';
+import { initFilterModal, setFilterData } from './ui/filterModal.js';
 
 // Global state (accessible to all modules)
 window.appState = {
@@ -82,26 +83,6 @@ function initSettings() {
     }
 }
 
-// Handle docs dropdown
-document.addEventListener('DOMContentLoaded', function() {
-    const docsBtn = document.getElementById('docs-btn');
-    const docsContent = document.querySelector('.docs-content');
-    
-    if (docsBtn && docsContent) {
-        docsBtn.addEventListener('click', function(e) {
-            e.stopPropagation();
-            docsContent.classList.toggle('show');
-        });
-        
-        // Close dropdown when clicking outside
-        document.addEventListener('click', function(e) {
-            if (!docsContent.contains(e.target) && e.target !== docsBtn) {
-                docsContent.classList.remove('show');
-            }
-        });
-    }
-});
-
 document.addEventListener('DOMContentLoaded', function () {
     // Initialize all modules
     initFormatToggle();
@@ -116,7 +97,44 @@ document.addEventListener('DOMContentLoaded', function () {
     initPreview();
     initSettings();
     initSearch();
+    initFilterModal();
 
     // Load history from localStorage
     loadHistory();
+
+    // Handle docs dropdown
+    const docsBtn = document.getElementById('docs-btn');
+    const docsContent = document.querySelector('.docs-content');
+
+    if (docsBtn && docsContent) {
+        docsBtn.addEventListener('click', function (e) {
+            e.stopPropagation();
+            docsContent.classList.toggle('show');
+        });
+
+        // Close dropdown when clicking outside
+        document.addEventListener('click', function (e) {
+            if (!docsContent.contains(e.target) && e.target !== docsBtn) {
+                docsContent.classList.remove('show');
+            }
+        });
+    }
+
+    // Update the response handling to include filter data setup
+    async function handleResponse(response) {
+        // ...existing response handling code...
+
+        try {
+            // Parse response data
+            const data = await response.json();
+
+            // Set filter data
+            setFilterData(data);
+
+            // ...rest of response handling...
+        } catch (error) {
+            console.error('Error parsing response:', error);
+            // Handle error appropriately
+        }
+    }
 });

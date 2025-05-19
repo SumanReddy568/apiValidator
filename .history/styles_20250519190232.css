@@ -1327,10 +1327,3 @@ body.light-mode pre#response-data {
     background-color: rgba(255, 160, 0, 0.5);
     border-bottom: 1px solid rgba(255, 160, 0, 0.9);
 }
-
-.header-actions {
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-    position: relative;
-}

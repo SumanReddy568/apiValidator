@@ -5,16 +5,329 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>API Validator</title>
-    <link rel="icon" type="image/svg+xml"
-        href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 640 512'%3E%3Cpath fill='%234CAF50' d='M392.8 1.2c-17-4.9-34.7 5-39.6 22l-128 448c-4.9 17 5 34.7 22 39.6s34.7-5 39.6-22l128-448c4.9-17-5-34.7-22-39.6zm80.6 120.1c-12.5 12.5-12.5 32.8 0 45.3L562.7 256l-89.3 89.4c-12.5 12.5-12.5 32.8 0 45.3s32.8 12.5 45.3 0l112-112c12.5-12.5 12.5-32.8 0-45.3l-112-112c-12.5-12.5-32.8-12.5-45.3 0zm-306.7 0c-12.5-12.5-32.8-12.5-45.3 0l-112 112c-12.5 12.5-12.5 32.8 0 45.3l112 112c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L77.3 256l89.4-89.4c12.5-12.5 12.5-32.8 0-45.3z'/%3E%3C/svg%3E" />
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 640 512'%3E%3Cpath fill='%234CAF50' d='M392.8 1.2c-17-4.9-34.7 5-39.6 22l-128 448c-4.9 17 5 34.7 22 39.6s34.7-5 39.6-22l128-448c4.9-17-5-34.7-22-39.6zm80.6 120.1c-12.5 12.5-12.5 32.8 0 45.3L562.7 256l-89.3 89.4c-12.5 12.5-12.5 32.8 0 45.3s32.8 12.5 45.3 0l112-112c12.5-12.5 12.5-32.8 0-45.3l-112-112c-12.5-12.5-32.8-12.5-45.3 0zm-306.7 0c-12.5-12.5-32.8-12.5-45.3 0l-112 112c-12.5 12.5-12.5 32.8 0 45.3l112 112c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L77.3 256l89.4-89.4c12.5-12.5 12.5-32.8 0-45.3z'/%3E%3C/svg%3E"/>
     <link rel="stylesheet" href="styles.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
-    <script type="module" src="styles.css"></script>
+    <script ty
     <script type="module" src="js/app.js"></script>
+    <style>
+        /* Simple modal styles that will definitely work */
+        .settings-modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.7);
+            z-index: 10000;
+        }
+
+        .settings-modal-content {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: #1e1e1e;
+            color: #e0e0e0;
+            padding: 20px;
+            border-radius: 5px;
+            width: 80%;
+            max-width: 500px;
+            border: 1px solid #333;
+        }
+
+        .settings-modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #333;
+        }
+
+        .settings-modal-body {
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .settings-modal-body textarea {
+            width: 100%;
+            height: 150px;
+            margin-top: 10px;
+            padding: 8px;
+            font-family: 'Fira Code', monospace;
+            background-color: #252525;
+            color: #e0e0e0;
+            border: 1px solid #444;
+        }
+
+        .settings-modal-footer {
+            display: flex;
+            justify-content: flex-end;
+            margin-top: 15px;
+            gap: 10px;
+        }
+
+        /* Dark theme for filter UI - updated colors to match app background */
+        .filter-container {
+            background-color: #1e1e1e;
+            border-radius: 5px;
+            padding: 10px;
+            margin-bottom: 10px;
+            border: 1px solid #333;
+        }
+
+        /* Updated Filter Styles */
+        .filter-group {
+            display: grid;
+            grid-template-columns: auto 1fr auto;
+            gap: 15px;
+            align-items: center;
+            margin-bottom: 15px;
+            padding: 10px;
+            background: #252525;
+            border-radius: 6px;
+        }
+
+        .filter-select,
+        .filter-operator,
+        #filter-value {
+            padding: 8px 12px;
+            border-radius: 4px;
+            border: 1px solid #444;
+            background: #1e1e1e;
+            color: #e0e0e0;
+            min-width: 150px;
+        }
+
+        .filter-select option,
+        .sub-field-select option,
+        .value-select option {
+            background-color: #252525;
+            color: #e0e0e0;
+        }
+
+        .filter-path-label {
+            background-color: #2a2a2a;
+            color: #b0b0b0;
+            padding: 5px 10px;
+            border-radius: 4px;
+            margin: 5px 0;
+            font-size: 0.9em;
+        }
+
+        .filter-value-display {
+            background-color: #2a2a2a;
+            color: #b0b0b0;
+            padding: 5px 10px;
+            border-radius: 4px;
+            margin: 5px 0;
+            font-style: italic;
+        }
+
+        .filter-tag {
+            display: inline-flex;
+            align-items: center;
+            background-color: #3a3a3a;
+            color: #e0e0e0;
+            padding: 5px 12px;
+            border-radius: 15px;
+            margin: 5px;
+            font-size: 0.9em;
+        }
+
+        .filter-tag strong {
+            color: #ffffff;
+            margin: 0 4px;
+        }
+
+        .filter-tag .remove-filter {
+            margin-left: 8px;
+            cursor: pointer;
+            color: #b0b0b0;
+        }
+
+        .filter-tag .remove-filter:hover {
+            color: #ff5e5e;
+        }
+
+        .no-values-message {
+            color: #b0b0b0;
+            font-style: italic;
+            padding: 5px;
+        }
+
+        /* Docs Dropdown Styles */
+        .docs-dropdown {
+            position: relative;
+            display: inline-block;
+        }
+
+        .docs-content {
+            display: none;
+            position: absolute;
+            right: 0;
+            background-color: #1e1e1e;
+            min-width: 300px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+            border-radius: 6px;
+            border: 1px solid #444;
+            z-index: 1000;
+        }
+
+        .docs-content.show {
+            display: block;
+        }
+
+        .docs-section {
+            padding: 15px;
+            border-bottom: 1px solid #333;
+        }
+
+        .docs-section:last-child {
+            border-bottom: none;
+        }
+
+        .docs-section h3 {
+            margin: 0 0 10px 0;
+            color: #e0e0e0;
+            font-size: 14px;
+        }
+
+        .api-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+
+        .api-list li {
+            margin-bottom: 8px;
+        }
+
+        .api-list a {
+            color: #64b5f6;
+            text-decoration: none;
+            font-size: 13px;
+        }
+
+        .api-list a:hover {
+            text-decoration: underline;
+        }
+
+        /* Make preview content scrollable */
+        .preview-content {
+            max-height: calc(100vh - 300px);
+            overflow-y: auto;
+            padding: 10px;
+        }
+
+        .preview-content::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        .preview-content::-webkit-scrollbar-track {
+            background: #1e1e1e;
+        }
+
+        .preview-content::-webkit-scrollbar-thumb {
+            background: #444;
+            border-radius: 4px;
+        }
+
+        .preview-content::-webkit-scrollbar-thumb:hover {
+            background: #555;
+        }
+
+        /* Ensure preview container doesn't overflow */
+        #preview-container {
+            word-break: break-word;
+        }
+
+        /* Request method colors - updated for better readability */
+        #request-method {
+            font-weight: 600;
+            padding: 6px 12px;
+            border-radius: 4px;
+        }
+
+        #request-method.method-GET {
+            background-color: rgba(76, 175, 80, 0.2);
+            color: #81c784;
+            border: 1px solid #81c784;
+        }
+
+        #request-method.method-POST {
+            background-color: rgba(33, 150, 243, 0.2);
+            color: #64b5f6;
+            border: 1px solid #64b5f6;
+        }
+
+        #request-method.method-PUT {
+            background-color: rgba(255, 152, 0, 0.2);
+            color: #ffb74d;
+            border: 1px solid #ffb74d;
+        }
+
+        #request-method.method-DELETE {
+            background-color: rgba(244, 67, 54, 0.2);
+            color: #e57373;
+            border: 1px solid #e57373;
+        }
+
+        #request-method.method-PATCH {
+            background-color: rgba(156, 39, 176, 0.2);
+            color: #ba68c8;
+            border: 1px solid #ba68c8;
+        }
+
+        /* Update dropdown options to match */
+        #request-method option {
+            background-color: #252525;
+            color: #e0e0e0;
+            font-weight: normal;
+        }
+
+        /* Search styles */
+        .search-container {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px;
+            background: #252525;
+            border-radius: 4px;
+            margin-bottom: 10px;
+        }
+
+        .search-input {
+            flex: 1;
+            background: #1e1e1e;
+            border: 1px solid #444;
+            color: #e0e0e0;
+            padding: 6px 12px;
+            border-radius: 4px;
+        }
+
+        .search-stats {
+            color: #888;
+            font-size: 0.9em;
+        }
+
+        .search-highlight {
+            background-color: rgba(255, 214, 0, 0.3);
+            border-bottom: 1px solid rgba(255, 214, 0, 0.7);
+            color: #fff;
+        }
+
+        .search-highlight.active {
+            background-color: rgba(255, 160, 0, 0.5);
+            border-bottom: 1px solid rgba(255, 160, 0, 0.9);
+        }
+    </style>
 </head>
 
 <body>
@@ -25,34 +338,33 @@
                 <h1>API Validator</h1>
             </div>
             <div class="header-actions">
-                <button id="docs-btn" class="btn-secondary">
-                    <i class="fas fa-book"></i> Docs
-                </button>
+                <div class="docs-dropdown">
+                    <button id="docs-btn" class="btn-secondary">
+                        <i class="fas fa-book"></i> Docs
+                    </button>
+                    <div class="docs-content">
+                        <div class="docs-section">
+                            <h3>Sample API Endpoints</h3>
+                            <ul class="api-list">
+                                <li><a href="https://restful-api.dev/" target="_blank">Restful API Dev</a></li>
+                                <li><a href="https://reqres.in/" target="_blank">ReqRes</a></li>
+                                <li><a href="https://fakeapi.platzi.com/" target="_blank">Platzi Fake Store API</a></li>
+                                <li><a href="https://fakestoreapi.com/docs" target="_blank">Fake Store API</a></li>
+                            </ul>
+                        </div>
+                        <div class="docs-section">
+                            <h3>Quick Test Endpoints</h3>
+                            <ul class="api-list">
+                                <li><a href="#" class="test-endpoint" data-url="https://api.restful-api.dev/objects">GET All Objects</a></li>
+                                <li><a href="#" class="test-endpoint" data-url="https://reqres.in/api/users">GET Users List</a></li>
+                                <li><a href="#" class="test-endpoint" data-url="https://fakestoreapi.com/products">GET Products</a></li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
                 <button id="settings-btn" class="btn-secondary">
                     <i class="fas fa-cog"></i> Settings
                 </button>
-                <div class="docs-content">
-                    <div class="docs-section">
-                        <h3>Sample API Endpoints</h3>
-                        <ul class="api-list">
-                            <li><a href="https://restful-api.dev/" target="_blank">Restful API Dev</a></li>
-                            <li><a href="https://reqres.in/" target="_blank">ReqRes</a></li>
-                            <li><a href="https://fakeapi.platzi.com/" target="_blank">Platzi Fake Store API</a></li>
-                            <li><a href="https://fakestoreapi.com/docs" target="_blank">Fake Store API</a></li>
-                        </ul>
-                    </div>
-                    <!-- <div class="docs-section">
-                        <h3>Quick Test Endpoints</h3>
-                        <ul class="api-list">
-                            <li><a href="#" class="test-endpoint" data-url="https://api.restful-api.dev/objects">GET All
-                                    Objects</a></li>
-                            <li><a href="#" class="test-endpoint" data-url="https://reqres.in/api/users">GET Users
-                                    List</a></li>
-                            <li><a href="#" class="test-endpoint" data-url="https://fakestoreapi.com/products">GET
-                                    Products</a></li>
-                        </ul>
-                    </div> -->
-                </div>
             </div>
         </header>
 

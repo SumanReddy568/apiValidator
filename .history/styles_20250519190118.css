@@ -419,8 +419,7 @@ textarea:focus {
     font-size: 0.95rem;
     color: var(--text-secondary);
     align-items: center;
-    flex-wrap: wrap;
-    /* Allow meta items to wrap on smaller screens */
+    flex-wrap: wrap; /* Allow meta items to wrap on smaller screens */
 }
 
 .status-code {
@@ -429,44 +428,33 @@ textarea:focus {
 
 .response-actions {
     display: flex;
-    /* justify-content: flex-start; */
-    /* Changed */
-    justify-content: space-between;
-    /* Changed */
-    align-items: center;
-    /* Added for vertical alignment */
+    /* justify-content: flex-start; */ /* Changed */
+    justify-content: space-between; /* Changed */
+    align-items: center; /* Added for vertical alignment */
     margin: 0.5rem 0 1rem 0;
     padding: 0 0.5rem;
-    gap: 1rem;
-    /* Add gap between filter container and format toggle */
+    gap: 1rem; /* Add gap between filter container and format toggle */
 }
 
 .request-actions {
     display: flex;
     justify-content: flex-start;
-    margin: 0.5rem 0 1rem 0;
-    /* Ensure consistent margin */
-    padding: 0 0.5rem;
-    /* Consistent padding */
+    margin: 0.5rem 0 1rem 0; /* Ensure consistent margin */
+    padding: 0 0.5rem; /* Consistent padding */
 }
 
 .request-actions .btn-secondary {
-    /* margin-bottom: 0; */
-    /* Removed to inherit from .btn-secondary */
-    font-size: 0.9rem;
-    /* Keep if specific font size is desired here */
+    /* margin-bottom: 0; */ /* Removed to inherit from .btn-secondary */
+    font-size: 0.9rem; /* Keep if specific font size is desired here */
 }
 
 .filter-container {
     display: flex;
     flex-direction: column;
     gap: 0.5rem;
-    /* width: 100%; */
-    /* Replaced by flex-grow */
-    flex-grow: 1;
-    /* Allow it to take available space */
-    min-width: 0;
-    /* Prevent overflow issues with flex children */
+    /* width: 100%; */ /* Replaced by flex-grow */
+    flex-grow: 1; /* Allow it to take available space */
+    min-width: 0; /* Prevent overflow issues with flex children */
 }
 
 .filter-group {
@@ -476,8 +464,7 @@ textarea:focus {
     flex-wrap: wrap;
 }
 
-.filter-group label {
-    /* Added for "Filter by:" label */
+.filter-group label { /* Added for "Filter by:" label */
     white-space: nowrap;
     color: var(--text-secondary);
 }
@@ -972,8 +959,7 @@ pre#response-data {
     padding: 1rem 1.5rem;
     display: flex;
     justify-content: flex-end;
-    align-items: center;
-    /* Ensure vertical alignment of buttons */
+    align-items: center; /* Ensure vertical alignment of buttons */
     gap: 0.75rem;
     border-top: 1px solid var(--border);
     background-color: rgba(14, 17, 26, 0.3);
@@ -983,8 +969,7 @@ pre#response-data {
 /* Ensure modal buttons have consistent height if text wrapping causes issues */
 .modal-actions .btn-primary,
 .modal-actions .btn-secondary {
-    min-height: 38px;
-    /* Adjust as needed based on your padding and font size */
+    min-height: 38px; /* Adjust as needed based on your padding and font size */
 }
 
 
@@ -1010,7 +995,6 @@ body.light-mode .header {
 body.light-mode pre#response-data {
     background-color: var(--surface-light);
 }
-
 /* Simple modal styles that will definitely work */
 .settings-modal {
     display: none;
@@ -1168,14 +1152,13 @@ body.light-mode pre#response-data {
     position: absolute;
     top: 100%;
     right: 0;
-    background-color: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+    background-color: #fff;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
     z-index: 1000;
     min-width: 250px;
     margin-top: 5px;
-    backdrop-filter: blur(10px);
 }
 
 .docs-content.show {
@@ -1184,7 +1167,7 @@ body.light-mode pre#response-data {
 
 .docs-section {
     padding: 15px;
-    border-bottom: 1px solid var(--border);
+    border-bottom: 1px solid #333;
 }
 
 .docs-section:last-child {
@@ -1193,7 +1176,7 @@ body.light-mode pre#response-data {
 
 .docs-section h3 {
     margin: 0 0 10px 0;
-    color: var(--text-primary);
+    color: #e0e0e0;
     font-size: 14px;
 }
 
@@ -1208,15 +1191,13 @@ body.light-mode pre#response-data {
 }
 
 .api-list a {
-    color: var(--primary);
+    color: #64b5f6;
     text-decoration: none;
     font-size: 13px;
-    transition: color 0.2s ease;
 }
 
 .api-list a:hover {
-    color: var(--primary-light);
-    text-decoration: none;
+    text-decoration: underline;
 }
 
 /* Make preview content scrollable */
@@ -1326,11 +1307,4 @@ body.light-mode pre#response-data {
 .search-highlight.active {
     background-color: rgba(255, 160, 0, 0.5);
     border-bottom: 1px solid rgba(255, 160, 0, 0.9);
-}
-
-.header-actions {
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-    position: relative;
 }

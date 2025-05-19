@@ -174,13 +174,16 @@
                                         <div class="filter-group">
                                             <label for="filter-type">Filter by:</label>
                                             <select id="filter-type" class="filter-select">
-                                                <option value="">Select field...</option>
+                                                <option value="">Choose field...</option>
                                             </select>
-                                            <select id="filter-operator" class="filter-select" style="display:none;">
-                                                <option value="match">equals</option>
+                                            <select id="filter-operator" class="filter-select">
+                                                <option value="equals">equals</option>
+                                                <option value="contains">contains</option>
+                                                <option value="startsWith">starts with</option>
+                                                <option value="endsWith">ends with</option>
                                             </select>
-                                            <input type="text" id="filter-value" placeholder="Filter value" />
-                                            <button id="apply-filter" class="btn-secondary">Apply</button>
+                                            <input type="text" id="filter-value" placeholder="Enter value..." />
+                                            <button id="apply-filter" class="btn-secondary">Apply Filter</button>
                                         </div>
                                         <div class="active-filters" id="active-filters">
                                             <!-- Active filters will be added here -->
