@@ -1,0 +1,26 @@
+{
+    "sourceFile": "js/.gitignore",
+    "activeCommit": 0,
+    "commits": [
+        {
+            "activePatchIndex": 2,
+            "patches": [
+                {
+                    "date": 1747663363585,
+                    "content": "Index: \n===================================================================\n--- \n+++ \n"
+                },
+                {
+                    "date": 1747663370993,
+                    "content": "Index: \n===================================================================\n--- \n+++ \n@@ -1,1 +1,2 @@\n-./\n\\ No newline at end of file\n+.history\n+.ln\n\\ No newline at end of file\n"
+                },
+                {
+                    "date": 1747663390852,
+                    "content": "Index: \n===================================================================\n--- \n+++ \n@@ -1,2 +1,2 @@\n-.history\n-.ln\n\\ No newline at end of file\n+.history/\n+.lh\n\\ No newline at end of file\n"
+                }
+            ],
+            "date": 1747663363585,
+            "name": "Commit-0",
+            "content": "./"
+        }
+    ]
+}
