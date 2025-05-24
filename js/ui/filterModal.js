@@ -6,6 +6,7 @@ import { getNestedValue } from '../utils/objectUtils.js';
 // Store the current data and filters
 let currentData = null;
 let activeFilters = [];
+let lastResponseData = null; // Store the last response
 
 /**
  * Initialize the filter modal
@@ -61,11 +62,11 @@ function hideFilterModal() {
  * Populate filter fields based on the current response data
  */
 function populateFilterFields() {
-    const fieldSelect = document.getElementById('filter-field-select');
+    const fieldSelect = document.getElementById('filter-type'); // Corrected ID
     if (!fieldSelect || !currentData) return;
 
     // Clear existing options
-    fieldSelect.innerHTML = '<option value="">Select a field</option>';
+    fieldSelect.innerHTML = '<option value="">Select a field...</option>';
 
     // Extract fields from the data
     const fields = extractFields(currentData);
@@ -77,14 +78,6 @@ function populateFilterFields() {
         option.textContent = field.label;
         fieldSelect.appendChild(option);
     });
-
-    // Set up field change handler
-    fieldSelect.onchange = function () {
-        const path = this.value;
-        if (!path) return;
-
-        updateOperatorAndValueOptions(path);
-    };
 }
 
 /**
@@ -275,18 +268,26 @@ function clearAllFilters() {
 /**
  * Apply all active filters to the data
  */
-function applyAllFilters() {
-    if (!currentData || activeFilters.length === 0) {
-        // If no filters, show original data
-        displayFilteredData(currentData);
+export function applyAllFilters() {
+    // Always use lastResponseData as the source of truth
+    if (!lastResponseData) {
+        displayFilteredData(null);
+        return;
+    }
+
+    // If no filters, show the original response data
+    if (activeFilters.length === 0) {
+        displayFilteredData(lastResponseData);
+        if (window.updatePreview) {
+            window.updatePreview(lastResponseData);
+        }
         return;
     }
 
     let filteredData;
 
-    if (Array.isArray(currentData)) {
-        // Filter array items
-        filteredData = currentData.filter(item => {
+    if (Array.isArray(lastResponseData)) {
+        filteredData = lastResponseData.filter(item => {
             return activeFilters.every(filter => {
                 const fieldPath = filter.field.replace('[0]', '');
                 const itemValue = getNestedValue(item, fieldPath);
@@ -309,34 +310,22 @@ function applyAllFilters() {
                 }
             });
         });
-    } else if (typeof currentData === 'object' && currentData !== null) {
-        // Clone the data
-        filteredData = JSON.parse(JSON.stringify(currentData));
-
-        // For each filter, find arrays in the data and filter them
+    } else if (typeof lastResponseData === 'object' && lastResponseData !== null) {
+        filteredData = JSON.parse(JSON.stringify(lastResponseData));
         activeFilters.forEach(filter => {
             const pathParts = filter.field.split('.');
             let current = filteredData;
             let pathSoFar = '';
-
-            // Traverse the path to find arrays
             for (let i = 0; i < pathParts.length; i++) {
                 const part = pathParts[i];
-
                 if (part.includes('[') && part.endsWith(']')) {
-                    // This is an array path
                     const arrayName = part.substring(0, part.indexOf('['));
-
                     if (arrayName && current[arrayName] && Array.isArray(current[arrayName])) {
-                        // Filter this array
                         const remainingPath = pathParts.slice(i + 1).join('.');
-
                         current[arrayName] = current[arrayName].filter(item => {
                             const itemValue = remainingPath ?
                                 getNestedValue(item, remainingPath) : item;
-
                             if (itemValue === undefined) return false;
-
                             switch (filter.operator) {
                                 case 'equal':
                                     return String(itemValue) === filter.value;
@@ -355,7 +344,6 @@ function applyAllFilters() {
                         break;
                     }
                 }
-
                 if (current[part] === undefined) break;
                 current = current[part];
                 pathSoFar += (pathSoFar ? '.' : '') + part;
@@ -363,8 +351,11 @@ function applyAllFilters() {
         });
     }
 
-    // Display the filtered data
     displayFilteredData(filteredData);
+
+    if (window.updatePreview) {
+        window.updatePreview(filteredData);
+    }
 }
 
 /**
@@ -374,11 +365,19 @@ function displayFilteredData(data) {
     const responseData = document.getElementById('response-data');
     if (!responseData) return;
 
-    if (!data) {
+    // Only show "No data matches your filters" if filters are active
+    if (activeFilters.length > 0 && (!data || (Array.isArray(data) && data.length === 0))) {
         responseData.textContent = 'No data matches your filters';
         return;
     }
 
+    // If no data and no filters, show nothing (blank)
+    if (!data) {
+        responseData.textContent = '';
+        return;
+    }
+
+    // Always show the original or filtered data
     responseData.innerHTML = syntaxHighlight(JSON.stringify(data, null, 2));
 }
 
@@ -387,6 +386,7 @@ function displayFilteredData(data) {
  */
 export function setFilterData(data) {
     currentData = data;
+    lastResponseData = data; // Always update the last response data
 
     // Reset active filters when data changes
     activeFilters = [];
@@ -397,4 +397,10 @@ export function setFilterData(data) {
     if (filterBtn) {
         filterBtn.disabled = !data;
     }
+
+    // Populate filter fields immediately when data is set
+    populateFilterFields();
+
+    // Always show the latest response data by default (force no filters)
+    displayFilteredData(lastResponseData);
 }

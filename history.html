@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>API Validator - Request History</title>
+    <link rel="icon" type="image/svg+xml"
+        href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 640 512'%3E%3Cpath fill='%234CAF50' d='M392.8 1.2c-17-4.9-34.7 5-39.6 22l-128 448c-4.9 17 5 34.7 22 39.6s34.7-5 39.6-22l128-448c4.9-17-5-34.7-22-39.6zm80.6 120.1c-12.5 12.5-12.5 32.8 0 45.3L562.7 256l-89.3 89.4c-12.5 12.5-12.5 32.8 0 45.3s32.8 12.5 45.3 0l112-112c12.5-12.5 12.5-32.8 0-45.3l-112-112c-12.5-12.5-32.8-12.5-45.3 0zm-306.7 0c-12.5-12.5-32.8-12.5-45.3 0l-112 112c-12.5 12.5-12.5 32.8 0 45.3l112 112c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L77.3 256l89.4-89.4c12.5-12.5 12.5-32.8 0-45.3z'/%3E%3C/svg%3E" />
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
+    <script type="module" src="js/history-page.js"></script>
+</head>
+
+<body>
+    <div class="app">
+        <header class="header">
+            <div class="logo">
+                <i class="fas fa-code"></i>
+                <h1>API Validator - History</h1>
+            </div>
+            <div class="header-actions">
+                <button id="back-btn" class="btn-secondary">
+                    <i class="fas fa-arrow-left"></i> Back to Editor
+                </button>
+                <button id="clear-all-history-btn" class="btn-secondary">
+                    <i class="fas fa-trash"></i> Clear All
+                </button>
+            </div>
+        </header>
+
+        <main class="container history-page-container">
+            <div class="card history-card">
+                <div class="card-header">
+                    <h2>Request History</h2>
+                    <div class="history-filter">
+                        <input type="text" id="history-search" placeholder="Search requests...">
+                        <select id="method-filter">
+                            <option value="">All Methods</option>
+                            <option value="GET">GET</option>
+                            <option value="POST">POST</option>
+                            <option value="PUT">PUT</option>
+                            <option value="DELETE">DELETE</option>
+                            <option value="PATCH">PATCH</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="history-table-container">
+                    <table class="history-table">
+                        <thead>
+                            <tr>
+                                <th>Method</th>
+                                <th>URL</th>
+                                <th>Status</th>
+                                <th>Time</th>
+                                <th>Date</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="history-tbody">
+                            <!-- History items will be inserted here dynamically -->
+                        </tbody>
+                    </table>
+                </div>
+                <div id="no-history-message" class="no-history-message" style="display: none;">
+                    <i class="fas fa-history fa-3x"></i>
+                    <p>No request history found.</p>
+                </div>
+            </div>
+        </main>
+
+        <!-- Response Details Modal -->
+        <div id="response-details-modal" class="modal-overlay">
+            <div class="modal-content response-details-modal">
+                <div class="modal-header">
+                    <h2>Request Details</h2>
+                    <button id="close-details-btn" class="btn-icon">&times;</button>
+                </div>
+                <div class="modal-body response-details-body">
+                    <div class="request-details-section">
+                        <h3>Request</h3>
+                        <div class="details-group">
+                            <label>Method:</label>
+                            <span id="detail-method"></span>
+                        </div>
+                        <div class="details-group">
+                            <label>URL:</label>
+                            <span id="detail-url"></span>
+                        </div>
+                        <div class="details-group">
+                            <label>Headers:</label>
+                            <pre id="detail-request-headers"></pre>
+                        </div>
+                        <div class="details-group">
+                            <label>Body:</label>
+                            <pre id="detail-request-body"></pre>
+                        </div>
+                    </div>
+                    <div class="response-details-section">
+                        <h3>Response</h3>
+                        <div class="details-group">
+                            <label>Status:</label>
+                            <span id="detail-status"></span>
+                        </div>
+                        <div class="details-group">
+                            <label>Time:</label>
+                            <span id="detail-time"></span>
+                        </div>
+                        <div class="details-group">
+                            <label>Headers:</label>
+                            <pre id="detail-response-headers"></pre>
+                        </div>
+                        <div class="details-group">
+                            <label>Body:</label>
+                            <pre id="detail-response-body"></pre>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-actions">
+                    <button id="load-request-btn" class="btn-primary">Load in Editor</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Notification container -->
+    <div id="notification-container"></div>
+</body>
+
+</html>

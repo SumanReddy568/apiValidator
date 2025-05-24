@@ -1,581 +1,441 @@
 import { showNotification } from '../utils/notifications.js';
-import { formatResponse } from './formatToggle.js';
 import { syntaxHighlight } from '../utils/formatting.js';
-import { getNestedValue } from '../utils/objectUtils.js';
 
+// Store current data and filter state
+let responseData = null;
+let currentFilterPath = null;
+let activeFilters = [];
+let currentFilteredData = null;
+
+/**
+ * Initialize filters functionality
+ */
 export function initFilterFunctionality() {
-    // Add filter event listeners
-    const applyFilterBtn = document.getElementById('apply-filter');
-    if (applyFilterBtn) {
-        applyFilterBtn.addEventListener('click', function () {
-            const filterType = document.getElementById('filter-type');
-            const filterOperator = document.getElementById('filter-operator');
-            const filterValue = document.getElementById('filter-value');
+    console.log('Initializing dynamic nested filters');
 
-            if (!filterType || !filterOperator || !filterValue) return;
-
-            const typeVal = filterType.value;
-            const operatorVal = filterOperator.value;
-            const valueVal = filterValue.value;
-
-            if (!typeVal) {
-                showNotification('Please select a field', 'warning');
-                return;
-            }
-
-            // For exclude operator, we need a value
-            if (operatorVal === 'exclude' && !valueVal) {
-                showNotification('Please enter a value to exclude', 'warning');
-                return;
-            }
-
-            applyFilterToResponse(typeVal, operatorVal, valueVal);
-        });
-    }
-
-    // Set up filter type change handler for nested objects
+    // Set up filter type change listener
     const filterType = document.getElementById('filter-type');
     if (filterType) {
         filterType.addEventListener('change', function () {
-            updateSubFieldOptions(filterType.value);
+            const selectedField = this.value;
+            updateFilterValueForField(selectedField);
         });
     }
 
-    // Filter input
-    const filterQuery = document.getElementById('filter-query');
-    if (filterQuery) {
-        filterQuery.addEventListener('input', () => {
-            if (window.appState.lastResponse) filterResponse(filterQuery.value);
+    // Apply filter button
+    const applyFilterBtn = document.getElementById('apply-filter');
+    if (applyFilterBtn) {
+        applyFilterBtn.addEventListener('click', function () {
+            applySelectedFilter();
+        });
+    }
+
+    // Clear filters button
+    const clearFiltersBtn = document.getElementById('clear-all-filters');
+    if (clearFiltersBtn) {
+        clearFiltersBtn.addEventListener('click', function () {
+            clearAllFilters();
         });
     }
 }
 
-export function filterResponse(query) {
-    if (!window.appState.lastResponse || typeof window.appState.lastResponse !== 'object') return;
+/**
+ * Update filter value options based on selected field
+ */
+function updateFilterValueForField(fieldPath) {
+    if (!fieldPath) return;
 
-    const responseData = document.getElementById('response-data');
-    if (!responseData) return;
+    const filterValue = document.getElementById('filter-value');
+    if (!filterValue) return;
 
-    if (!query) {
-        formatResponse(window.appState.prettyPrintEnabled);
-        return;
-    }
+    // Reset value
+    filterValue.value = '';
 
-    try {
-        const parts = query.split('.');
-        let result = window.appState.lastResponse;
+    // For array data with objects, we need special handling
+    if (Array.isArray(responseData) && responseData.length > 0 && typeof responseData[0] === 'object') {
+        // Get unique values for this field
+        const uniqueValues = new Set();
 
-        for (let part of parts) {
-            if (!result) break;
+        // Handle array notation by removing [0] if present
+        const normalizedPath = fieldPath.replace(/\[\d+\]/g, '');
 
-            if (part.includes('[') && part.includes(']')) {
-                const arrayName = part.substring(0, part.indexOf('['));
-                const indexStr = part.substring(part.indexOf('[') + 1, part.indexOf(']'));
-                const index = parseInt(indexStr);
-
-                result = arrayName ? result[arrayName]?.[index] : result[index];
-            } else {
-                result = result[part];
+        responseData.forEach(item => {
+            const value = getNestedValue(item, normalizedPath);
+            if (value !== undefined && value !== null) {
+                uniqueValues.add(String(value));
             }
-        }
+        });
 
-        if (result === undefined || result === null) {
-            responseData.textContent = 'No results for this filter query';
-            return;
-        }
+        // Create datalist with unique values if not too many
+        if (uniqueValues.size > 0 && uniqueValues.size < 100) {
+            // Create or get datalist element
+            let datalist = document.getElementById('filter-value-list');
+            if (!datalist) {
+                datalist = document.createElement('datalist');
+                datalist.id = 'filter-value-list';
+                document.body.appendChild(datalist);
+            } else {
+                datalist.innerHTML = '';
+            }
 
-        if (typeof result === 'object') {
-            responseData.innerHTML = syntaxHighlight(JSON.stringify(result, null, 4));
+            // Add options to datalist
+            Array.from(uniqueValues)
+                .sort() // Sort values for better UX
+                .forEach(value => {
+                    const option = document.createElement('option');
+                    option.value = value;
+                    datalist.appendChild(option);
+                });
+
+            filterValue.setAttribute('list', 'filter-value-list');
+            filterValue.placeholder = `Select a value (${uniqueValues.size} options)`;
         } else {
-            responseData.textContent = String(result);
+            filterValue.removeAttribute('list');
+            filterValue.placeholder = 'Enter value to filter';
         }
-    } catch (e) {
-        console.error('Filter error:', e);
-        responseData.textContent = `Error applying filter: ${e.message}`;
     }
 }
 
-export function updateFilterFieldOptions(data) {
-    const filterTypeSelect = document.getElementById('filter-type');
-    if (!filterTypeSelect) {
-        console.error('Filter type select element not found.');
-        return;
-    }
-
-    // Reset filter UI
-    resetFilterUI();
-
-    // Store the full response data for later use in filtering
-    window.appState.fullResponseData = data;
-
-    // Identify the main array or object in the response
-    let mainData = data;
-
-    // Check if the data has a structure with nested arrays (like testRuns in your example)
-    if (typeof data === 'object' && data !== null && !Array.isArray(data)) {
-        const keys = Object.keys(data);
-        for (const key of keys) {
-            if (Array.isArray(data[key]) && data[key].length > 0) {
-                // Found an array property that might be the main data
-                const option = document.createElement('option');
-                option.value = key;
-                option.textContent = key;
-                filterTypeSelect.appendChild(option);
-            } else if (typeof data[key] === 'object' && data[key] !== null) {
-                // Found a nested object
-                const option = document.createElement('option');
-                option.value = key;
-                option.textContent = key;
-                filterTypeSelect.appendChild(option);
-            } else {
-                // Simple property
-                const option = document.createElement('option');
-                option.value = key;
-                option.textContent = key;
-                filterTypeSelect.appendChild(option);
-            }
-        }
-    } else if (Array.isArray(data)) {
-        // If it's directly an array
-        mainData = data;
-
-        // If it's an array of objects, add "[root]" option
-        if (data.length > 0 && typeof data[0] === 'object') {
-            const option = document.createElement('option');
-            option.value = "[root]";
-            option.textContent = "Array Items";
-            filterTypeSelect.appendChild(option);
-        }
-    }
-
-    // Update filter operator options
-    updateFilterOperators();
-}
-
-function resetFilterUI() {
-    const filterTypeSelect = document.getElementById('filter-type');
+/**
+ * Apply the selected filter
+ */
+function applySelectedFilter() {
+    const filterType = document.getElementById('filter-type');
     const filterOperator = document.getElementById('filter-operator');
     const filterValue = document.getElementById('filter-value');
 
-    // Clear existing options
-    while (filterTypeSelect.options.length > 0) {
-        filterTypeSelect.remove(0);
-    }
+    if (!filterType || !filterOperator || !filterValue) return;
 
-    // Add default option
-    const defaultOption = document.createElement('option');
-    defaultOption.value = "";
-    defaultOption.textContent = "Select Path";
-    defaultOption.selected = true;
-    filterTypeSelect.appendChild(defaultOption);
+    const field = filterType.value;
+    const operator = filterOperator.value;
+    const value = filterValue.value;
 
-    // Reset other fields
-    if (filterValue) filterValue.value = '';
-
-    // Remove any sub-field selects
-    const subFieldContainer = document.getElementById('sub-field-container');
-    if (subFieldContainer) {
-        while (subFieldContainer.firstChild) {
-            subFieldContainer.removeChild(subFieldContainer.firstChild);
-        }
-    }
-}
-
-function updateSubFieldOptions(selectedPath) {
-    if (!selectedPath || !window.appState.fullResponseData) return;
-
-    // Create or get the sub-field container
-    let subFieldContainer = document.getElementById('sub-field-container');
-    if (!subFieldContainer) {
-        subFieldContainer = document.createElement('div');
-        subFieldContainer.id = 'sub-field-container';
-        subFieldContainer.className = 'sub-field-container';
-
-        // Insert after the main filter type
-        const filterType = document.getElementById('filter-type');
-        filterType.parentNode.insertBefore(subFieldContainer, filterType.nextSibling);
-    }
-
-    // Clear existing sub-fields
-    while (subFieldContainer.firstChild) {
-        subFieldContainer.removeChild(subFieldContainer.firstChild);
-    }
-
-    let targetData;
-
-    // Different handling for root array
-    if (selectedPath === "[root]" && Array.isArray(window.appState.fullResponseData)) {
-        targetData = window.appState.fullResponseData[0]; // First item in the array
-    } else {
-        // Handle array path (e.g., "testRuns")
-        const isArrayPath = Array.isArray(getNestedValue(window.appState.fullResponseData, selectedPath));
-
-        if (isArrayPath) {
-            // For array paths, get the first item to see the structure
-            const arrayData = getNestedValue(window.appState.fullResponseData, selectedPath);
-            targetData = arrayData && arrayData.length > 0 ? arrayData[0] : null;
-
-            // Create a label to show we're exploring array items
-            const arrayLabel = document.createElement('div');
-            arrayLabel.className = 'filter-path-label';
-            arrayLabel.textContent = `Showing fields from ${selectedPath}[0]`;
-            subFieldContainer.appendChild(arrayLabel);
-        } else {
-            targetData = getNestedValue(window.appState.fullResponseData, selectedPath);
-        }
-    }
-
-    // For non-object data, show the value
-    if (targetData !== undefined && (typeof targetData !== 'object' || targetData === null)) {
-        const valueDisplay = document.createElement('div');
-        valueDisplay.className = 'filter-value-display';
-        valueDisplay.textContent = `Value: ${JSON.stringify(targetData)}`;
-        subFieldContainer.appendChild(valueDisplay);
+    if (!field || !value) {
+        showNotification('Please select a field and enter a value', 'warning');
         return;
     }
 
-    // If we have an object with properties
-    if (typeof targetData === 'object' && targetData !== null) {
-        const subSelect = document.createElement('select');
-        subSelect.className = 'filter-select sub-field-select';
+    // Add filter
+    addFilter(field, operator, value);
 
-        // Default option
-        const defaultOption = document.createElement('option');
-        defaultOption.value = "";
-        defaultOption.textContent = "Select Property";
-        defaultOption.selected = true;
-        subSelect.appendChild(defaultOption);
+    // Apply filters to data
+    const filteredData = applyFilters();
 
-        // Add options for each property
-        for (const key of Object.keys(targetData)) {
-            const option = document.createElement('option');
-            option.value = key;
-            option.textContent = key;
-            subSelect.appendChild(option);
-        }
+    // Update display with filtered data
+    updateDisplayWithFilteredData(filteredData);
 
-        // Event listener for property selection
-        subSelect.addEventListener('change', function () {
-            if (!subSelect.value) return;
+    // Reset and update filter options based on filtered data
+    updateFilterOptionsForFilteredData(filteredData);
 
-            const fullPath = selectedPath === "[root]" ?
-                subSelect.value :
-                `${selectedPath}.${subSelect.value}`;
-
-            // Check if this is an object property that can be further explored
-            const propertyValue = getNestedValue(window.appState.fullResponseData, fullPath);
-
-            if (typeof propertyValue === 'object' && propertyValue !== null && !Array.isArray(propertyValue)) {
-                // Handle nested object
-                const combinedPath = fullPath;
-                updateNestedSubFields(combinedPath, subFieldContainer, subSelect);
-            } else {
-                // For primitive values or arrays, show available values
-                displayFieldValues(fullPath, subFieldContainer, subSelect);
-            }
-        });
-
-        subFieldContainer.appendChild(subSelect);
-    }
+    // Clear value input
+    filterValue.value = '';
 }
 
-// Add this new function to extract unique values for a given path
-function extractUniqueValues(data, path) {
-    if (!data || !path) return [];
+/**
+ * Add a filter to the active filters list
+ */
+function addFilter(field, operator, value) {
+    // Get human-readable field and operator names
+    const fieldSelect = document.getElementById('filter-type');
+    const operatorSelect = document.getElementById('filter-operator');
 
-    // Get the value at the given path
-    let values = [];
-    let targetData = getNestedValue(data, path);
+    const fieldDisplay = fieldSelect.options[fieldSelect.selectedIndex].textContent;
+    const operatorDisplay = operatorSelect.options[operatorSelect.selectedIndex].textContent;
 
-    // Handle array data specifically (most common case)
-    if (Array.isArray(targetData)) {
-        // This is an array of objects most likely, so we return the array
-        return targetData;
-    }
+    // Create filter object
+    const filter = {
+        field,
+        operator,
+        value,
+        fieldDisplay,
+        operatorDisplay
+    };
 
-    // Find all values in the data structure that match this path
-    // This is useful when we have an array of objects and looking for all values of a specific field
-    if (Array.isArray(data)) {
-        // Path might be a property of items in this array
-        const fieldParts = path.split('.');
-        const lastField = fieldParts[fieldParts.length - 1];
+    // Add to active filters
+    activeFilters.push(filter);
 
-        data.forEach(item => {
-            if (typeof item === 'object' && item !== null) {
-                const itemValue = fieldParts.length === 1 ?
-                    item[lastField] :
-                    getNestedValue(item, path);
-
-                if (itemValue !== undefined && !values.includes(itemValue)) {
-                    values.push(itemValue);
-                }
-            }
-        });
-    }
-
-    return values;
+    // Update UI
+    updateActiveFiltersUI();
 }
 
-// New function to display all available values for a selected field
-function displayFieldValues(path, container, previousSelect) {
-    // Remove any elements after the current select
-    let next = previousSelect.nextSibling;
-    while (next) {
-        const toRemove = next;
-        next = next.nextSibling;
-        container.removeChild(toRemove);
-    }
+/**
+ * Update active filters UI
+ */
+function updateActiveFiltersUI() {
+    const container = document.getElementById('active-filters');
+    if (!container) return;
 
-    // Get array data that contains this path
-    let arrayData;
-    const pathParts = path.split('.');
-    let arrayPath = "";
+    // Clear existing filters
+    container.innerHTML = '';
 
-    // Find the array in the path if any
-    for (let i = 0; i < pathParts.length; i++) {
-        const currentPath = pathParts.slice(0, i + 1).join('.');
-        const currentData = getNestedValue(window.appState.fullResponseData, currentPath);
+    // Add each filter
+    activeFilters.forEach((filter, index) => {
+        const filterTag = document.createElement('div');
+        filterTag.className = 'filter-badge';
 
-        if (Array.isArray(currentData)) {
-            arrayPath = currentPath;
-            arrayData = currentData;
-            break;
-        }
-    }
+        filterTag.innerHTML = `
+            <span class="filter-field">${filter.fieldDisplay}</span>
+            <span class="filter-operator">${filter.operatorDisplay}</span>
+            <span class="filter-value">${filter.value}</span>
+            <button class="remove-filter" data-index="${index}">×</button>
+        `;
 
-    if (!arrayPath && Array.isArray(window.appState.fullResponseData)) {
-        // Root is an array
-        arrayData = window.appState.fullResponseData;
-    }
+        // Add click handler to remove button
+        filterTag.querySelector('.remove-filter').addEventListener('click', function () {
+            const index = parseInt(this.dataset.index);
+            activeFilters.splice(index, 1);
+            updateActiveFiltersUI();
 
-    // Extract unique values for this field
-    const values = new Set();
-    const fieldName = pathParts[pathParts.length - 1];
-
-    if (arrayData) {
-        // If we have array data, extract values from it
-        arrayData.forEach(item => {
-            // If the field is directly on the array items
-            if (pathParts.length === 1 || path.startsWith('[root].')) {
-                if (item && typeof item === 'object' && item[fieldName] !== undefined) {
-                    values.add(String(item[fieldName]));
-                }
-            } else {
-                // For nested fields, we need to get the relevant part of the path
-                const relPathParts = arrayPath === "" ?
-                    pathParts :
-                    pathParts.slice(pathParts.indexOf(arrayPath.split('.').pop()) + 1);
-
-                let currentItem = item;
-                for (let i = 0; i < relPathParts.length - 1; i++) {
-                    if (!currentItem || typeof currentItem !== 'object') break;
-                    currentItem = currentItem[relPathParts[i]];
-                }
-
-                if (currentItem && typeof currentItem === 'object' && currentItem[fieldName] !== undefined) {
-                    values.add(String(currentItem[fieldName]));
-                }
-            }
-        });
-    } else {
-        // If no array in the path, just get the single value
-        const value = getNestedValue(window.appState.fullResponseData, path);
-        if (value !== undefined) values.add(String(value));
-    }
-
-    // Create value selector
-    if (values.size > 0) {
-        const valueSelect = document.createElement('select');
-        valueSelect.className = 'filter-select value-select';
-
-        const defaultOption = document.createElement('option');
-        defaultOption.value = "";
-        defaultOption.textContent = `Available ${fieldName} values (${values.size})`;
-        defaultOption.selected = true;
-        valueSelect.appendChild(defaultOption);
-
-        // Convert set to array and sort for consistent display
-        Array.from(values).sort().forEach(val => {
-            const option = document.createElement('option');
-            option.value = val;
-            option.textContent = val;
-            valueSelect.appendChild(option);
+            // Reapply remaining filters from original data
+            const filteredData = applyFilters();
+            updateDisplayWithFilteredData(filteredData);
+            updateFilterOptionsForFilteredData(filteredData);
         });
 
-        // When a value is selected, apply a filter to show only matching items
-        valueSelect.addEventListener('change', function () {
-            if (!valueSelect.value) return;
-
-            const filterValue = valueSelect.value;
-            createFilterTag(path, fieldName, filterValue, 'match');
-        });
-
-        container.appendChild(valueSelect);
-    } else {
-        const noValues = document.createElement('div');
-        noValues.className = 'no-values-message';
-        noValues.textContent = 'No values found for this field';
-        container.appendChild(noValues);
-    }
-}
-
-// Helper to create filter tags
-function createFilterTag(path, fieldName, value, operator) {
-    const activeFilters = document.getElementById('active-filters');
-    if (!activeFilters) return;
-
-    const filterTag = document.createElement('div');
-    filterTag.className = 'filter-tag';
-
-    // Format the display
-    filterTag.innerHTML = `
-        ${fieldName} = "${value}"
-        <span class="remove-filter"><i class="fas fa-times"></i></span>
-    `;
-
-    filterTag.querySelector('.remove-filter')?.addEventListener('click', () => {
-        filterTag.remove();
-        applyAllFilters();
+        container.appendChild(filterTag);
     });
 
-    // Store filter data
-    filterTag.dataset.path = path;
-    filterTag.dataset.operator = operator;
-    filterTag.dataset.value = value;
-
-    activeFilters.appendChild(filterTag);
-    applyAllFilters();
+    // Show/hide clear all button
+    const clearBtn = document.getElementById('clear-all-filters');
+    if (clearBtn) {
+        clearBtn.style.display = activeFilters.length ? 'block' : 'none';
+    }
 }
 
-// Update this function for our revised filtering approach
-function applyAllFilters() {
-    if (!window.appState.fullResponseData) return;
+/**
+ * Apply all active filters to the data
+ */
+function applyFilters() {
+    if (!responseData) return null;
 
+    // If no filters, return original data
+    if (activeFilters.length === 0) {
+        currentFilteredData = responseData;
+        return responseData;
+    }
+
+    let filteredData = responseData;
+
+    // Apply each filter in sequence
+    activeFilters.forEach(filter => {
+        // For array data, filter items
+        if (Array.isArray(filteredData)) {
+            filteredData = filteredData.filter(item => {
+                // Handle array notation by removing [0] if present
+                const normalizedPath = filter.field.replace(/\[\d+\]/g, '');
+                const itemValue = getNestedValue(item, normalizedPath);
+
+                if (itemValue === undefined || itemValue === null) return false;
+
+                return compareValues(itemValue, filter.operator, filter.value);
+            });
+        }
+        // For object data, handle differently (can't filter properties of a single object)
+        else if (typeof filteredData === 'object' && filteredData !== null) {
+            // For objects, we'll create a new object with only matching properties
+            // This is more complex and may need to be customized based on your needs
+            console.log('Object filtering is not fully implemented');
+        }
+    });
+
+    // Store current filtered data
+    currentFilteredData = filteredData;
+    return filteredData;
+}
+
+/**
+ * Update display with filtered data
+ */
+function updateDisplayWithFilteredData(data) {
     const responseData = document.getElementById('response-data');
     if (!responseData) return;
 
-    const filterTags = document.querySelectorAll('.filter-tag');
-    if (!filterTags || filterTags.length === 0) {
-        // If no filters, show original data
-        formatResponse(window.appState.prettyPrintEnabled);
+    // If no active filters, always show original response data
+    if (activeFilters.length === 0) {
+        if (window.appState?.lastResponse) {
+            try {
+                const formatted = JSON.stringify(window.appState.lastResponse, null, 2);
+                responseData.innerHTML = syntaxHighlight(formatted);
+                return;
+            } catch (error) {
+                console.error('Error formatting original response:', error);
+            }
+        }
         return;
     }
 
-    // Create a mapping of paths to filter criteria
-    const filters = [];
-    filterTags.forEach(tag => {
-        filters.push({
-            path: tag.dataset.path,
-            operator: tag.dataset.operator,
-            value: tag.dataset.value
+    // Only show "no matches" if we have active filters and no matching data
+    if (!data || (Array.isArray(data) && data.length === 0)) {
+        // Show "No results found" message instead of resetting filters
+        responseData.innerHTML = `<div class="no-results-message">No results found for the applied filters.</div>`;
+        return;
+    }
+
+    // Show filtered data
+    try {
+        const formatted = JSON.stringify(data, null, 2);
+        responseData.innerHTML = syntaxHighlight(formatted);
+
+        // Update preview if available
+        if (window.updatePreview) {
+            window.updatePreview(data);
+        }
+    } catch (error) {
+        console.error('Error formatting filtered data:', error);
+    }
+}
+
+/**
+ * Update filter options based on filtered data
+ */
+function updateFilterOptionsForFilteredData(data) {
+    // We don't want to replace the current filter type options
+    // Instead we'll use the filtered data to update the value options
+
+    // If there's a currently selected field, update its value options
+    const filterType = document.getElementById('filter-type');
+    if (filterType && filterType.value) {
+        updateFilterValueForField(filterType.value);
+    }
+}
+
+/**
+ * Compare values based on operator
+ */
+function compareValues(actual, operator, expected) {
+    // Convert to strings for comparison (case insensitive)
+    const actualStr = String(actual).toLowerCase();
+    const expectedStr = String(expected).toLowerCase();
+
+    switch (operator) {
+        case 'match':
+        case 'equal':
+            return actualStr === expectedStr;
+        case 'not_match':
+        case 'not_equal':
+            return actualStr !== expectedStr;
+        case 'contains':
+            return actualStr.includes(expectedStr);
+        case 'starts_with':
+            return actualStr.startsWith(expectedStr);
+        case 'ends_with':
+            return actualStr.endsWith(expectedStr);
+        case 'greater':
+            return Number(actual) > Number(expected);
+        case 'less':
+            return Number(actual) < Number(expected);
+        default:
+            return false;
+    }
+}
+
+/**
+ * Get a nested value from an object
+ */
+function getNestedValue(obj, path) {
+    if (!obj || !path) return undefined;
+
+    const parts = path.split('.');
+    let current = obj;
+
+    for (const part of parts) {
+        if (current === null || current === undefined) return undefined;
+        current = current[part];
+    }
+
+    return current;
+}
+
+/**
+ * Clear all filters
+ */
+function clearAllFilters() {
+    activeFilters = [];
+    updateActiveFiltersUI();
+
+    // Reset to original data
+    updateDisplayWithFilteredData(responseData);
+
+    // Reset filter options
+    updateFilterFieldOptions(responseData);
+}
+
+/**
+ * Extract filterable fields from data
+ */
+function extractFilterableFields(data, prefix = '') {
+    const fields = [];
+
+    if (Array.isArray(data)) {
+        // For arrays, analyze the first item as a representative sample
+        if (data.length > 0 && typeof data[0] === 'object' && data[0] !== null) {
+            extractFilterableFields(data[0], prefix ? `${prefix}[0]` : '[0]')
+                .forEach(field => fields.push(field));
+
+            // Special case for IDs in array of objects
+            if (data[0].id !== undefined) {
+                fields.unshift({
+                    path: 'id',
+                    label: 'id',
+                    type: typeof data[0].id
+                });
+            }
+        }
+    } else if (typeof data === 'object' && data !== null) {
+        // For objects, add all properties
+        Object.entries(data).forEach(([key, value]) => {
+            const path = prefix ? `${prefix}.${key}` : key;
+            const label = key;
+
+            fields.push({
+                path,
+                label,
+                type: typeof value
+            });
+
+            // Recursively process nested objects
+            if (typeof value === 'object' && value !== null) {
+                extractFilterableFields(value, path).forEach(field => fields.push(field));
+            }
         });
+    }
+
+    return fields;
+}
+
+/**
+ * Update filter field options with data
+ */
+export function updateFilterFieldOptions(data) {
+    // Keep track of original data for filters
+    responseData = data;
+    currentFilteredData = data;
+
+    const filterType = document.getElementById('filter-type');
+    if (!filterType || !data) return;
+
+    // Clear existing options
+    filterType.innerHTML = '<option value="">Select field...</option>';
+
+    // Extract fields from data
+    const fields = extractFilterableFields(data);
+
+    // Sort fields alphabetically for better UX
+    fields.sort((a, b) => a.label.localeCompare(b.label));
+
+    // Add fields to select
+    fields.forEach(field => {
+        const option = document.createElement('option');
+        option.value = field.path;
+        option.textContent = field.label;
+        option.dataset.type = field.type;
+        filterType.appendChild(option);
     });
 
-    // Start with a deep copy of the original data
-    let resultData = JSON.parse(JSON.stringify(window.appState.fullResponseData));
+    // Reset active filters when data changes
+    activeFilters = [];
+    updateActiveFiltersUI();
 
-    // Apply filters - we'll focus mostly on filtering array data
-    for (const filter of filters) {
-        resultData = applyFilter(resultData, filter);
-    }
-
-    // Update the display with filtered data
-    responseData.innerHTML = syntaxHighlight(JSON.stringify(resultData, null, 2));
-}
-
-// New approach to apply filters
-function applyFilter(data, filter) {
-    // Find if we're filtering an array
-    const pathParts = filter.path.split('.');
-    let currentData = data;
-    let currentPath = '';
-    let arrayPath = null;
-
-    // Find the array in the path
-    for (let i = 0; i < pathParts.length; i++) {
-        if (currentPath) {
-            currentPath += '.';
-        }
-        currentPath += pathParts[i];
-
-        if (Array.isArray(getNestedValue(data, currentPath))) {
-            arrayPath = currentPath;
-            break;
-        }
-    }
-
-    // If no array was found in the path but the root is an array
-    if (!arrayPath && Array.isArray(data)) {
-        arrayPath = ''; // Root array
-    }
-
-    // If we found an array, filter it
-    if (arrayPath !== null) {
-        return filterDataArray(data, arrayPath, filter);
-    }
-
-    // If no array to filter, return the original data
-    return data;
-}
-
-// Filter an array at the given path
-function filterDataArray(data, arrayPath, filter) {
-    const result = JSON.parse(JSON.stringify(data));
-    const targetArray = arrayPath ? getNestedValue(result, arrayPath) : result;
-
-    if (!Array.isArray(targetArray)) return result;
-
-    // Get the field to filter on (relative to array items)
-    const fullPath = filter.path;
-    let fieldPath;
-
-    if (arrayPath === '') {
-        // Root array
-        fieldPath = fullPath;
-    } else {
-        // Get the part of the path after the array
-        const arrayPathParts = arrayPath.split('.');
-        const fullPathParts = fullPath.split('.');
-        fieldPath = fullPathParts.slice(arrayPathParts.length).join('.');
-    }
-
-    // Filter the array
-    const filtered = targetArray.filter(item => {
-        if (!item || typeof item !== 'object') return false;
-
-        // Get the value from the item
-        const itemValue = fieldPath.includes('.') ?
-            getNestedValue(item, fieldPath) :
-            item[fieldPath];
-
-        if (itemValue === undefined) return false;
-
-        // Apply the filter condition
-        if (filter.operator === 'match') {
-            return String(itemValue) === filter.value;
-        }
-        return true; // Default case
-    });
-
-    // Update the array in the result
-    if (arrayPath) {
-        // For a nested array
-        const parts = arrayPath.split('.');
-        let current = result;
-        for (let i = 0; i < parts.length - 1; i++) {
-            current = current[parts[i]];
-        }
-        current[parts[parts.length - 1]] = filtered;
-    } else {
-        // For a root array
-        return filtered;
-    }
-
-    return result;
-}
-
-function updateFilterOperators() {
-    // This function is no longer needed since we're using a hardcoded match operator
-    // But we'll keep it to fix the reference error
-    console.log('Filter operators updated');
+    // Do NOT update the response display here as it was already handled in sendRequest.js
+    // This prevents overwriting the already formatted and displayed response
 }

@@ -1,6 +1,6 @@
 import { showNotification } from '../utils/notifications.js';
 import { formatResponse } from '../ui/formatToggle.js';
-import { updatePreviewTab } from '../ui/preview.js';
+import { updatePreview } from '../ui/preview.js';
 import { updateFilterFieldOptions } from '../ui/filters.js';
 import { addToHistory } from './history.js';
 import { escapeHtml } from '../utils/escaping.js';
@@ -105,7 +105,7 @@ function clearRequest() {
     // Clear response section
     const responseDataEl = document.getElementById('response-data');
     if (responseDataEl) {
-        responseDataEl.textContent = 'No response yet. Send a request to see results.';
+        responseDataEl.textContent = '';
     }
 
     const statusEl = document.getElementById('status');
@@ -413,7 +413,7 @@ export async function sendRequest() {
         try {
             const response = await fetch(urlObj.toString(), fetchOptions);
             console.log('Direct fetch successful');
-            await handleResponse(response, { startTime, method, urlObj });
+            await handleResponse(response, { startTime, method, urlObj, finalHeaders });
         } catch (error) {
             if (error.message.includes('Failed to fetch') || error.name === 'TypeError') {
                 console.log('Direct fetch failed, trying with CORS proxy...');
@@ -422,7 +422,7 @@ export async function sendRequest() {
                     1. Enable CORS in your API
                     2. Use a CORS proxy
                     3. Run browser with disabled security`, 'warning', 10000);
-                
+
                 const proxyUrl = CORS_PROXY + urlObj.toString();
                 const proxyResponse = await fetch(proxyUrl, {
                     ...fetchOptions,
@@ -431,7 +431,7 @@ export async function sendRequest() {
                         'X-Requested-With': 'XMLHttpRequest'
                     }
                 });
-                await handleResponse(proxyResponse, { startTime, method, urlObj });
+                await handleResponse(proxyResponse, { startTime, method, urlObj, finalHeaders });
             } else {
                 throw error;
             }
@@ -448,76 +448,141 @@ export async function sendRequest() {
     }
 }
 
-async function handleResponse(response, { startTime, method, urlObj }) {
-    const endTime = Date.now();
-    const responseTime = endTime - startTime;
-    
-    const headersTableBody = document.querySelector('#response-headers-table tbody');
-    const responseDataEl = document.getElementById('response-data');
-    const statusEl = document.getElementById('status');
-    const responseTimeEl = document.getElementById('response-time');
-    const responseSizeEl = document.getElementById('response-size');
-
-    // Update headers table
-    if (headersTableBody) {
-        headersTableBody.innerHTML = '';
-        response.headers.forEach((value, key) => {
-            const row = document.createElement('tr');
-            row.innerHTML = `<td>${escapeHtml(key)}</td><td>${escapeHtml(value)}</td>`;
-            headersTableBody.appendChild(row);
-        });
-    }
-
-    // Handle response data
-    const contentType = response.headers.get('content-type');
-    const responseDataText = await response.text();
-    let parsedResponseData;
-    let isJson = false;
-
+async function handleResponse(response, { startTime, method, urlObj, finalHeaders }) {
     try {
-        // Try parsing as JSON regardless of content type
-        parsedResponseData = JSON.parse(responseDataText);
-        isJson = true;
-    } catch (e) {
-        // If parsing fails, use raw text
-        parsedResponseData = responseDataText;
-        console.log('Response is not JSON:', e.message);
-    }
+        // Parse the response based on content type
+        const contentType = response.headers.get('content-type');
+        let data;
 
-    // Update UI elements
-    if (statusEl) {
-        statusEl.textContent = `${response.status} ${response.statusText}`;
-        statusEl.className = 'status-code';
-        if (response.status >= 200 && response.status < 300) statusEl.classList.add('status-2xx');
-        else if (response.status >= 400) statusEl.classList.add('status-4xx');
-    }
-
-    if (responseTimeEl) responseTimeEl.textContent = responseTime;
-
-    if (responseSizeEl) {
-        const size = new TextEncoder().encode(responseDataText).length / 1024;
-        responseSizeEl.textContent = size.toFixed(2);
-    }
-
-    if (responseDataEl) {
-        if (isJson) {
-            window.appState.lastResponse = parsedResponseData;
-            formatResponse(window.appState.prettyPrintEnabled);
+        if (contentType?.includes('application/json')) {
+            data = await response.json();
+        } else if (contentType?.includes('text/')) {
+            data = await response.text();
         } else {
-            responseDataEl.textContent = responseDataText;
+            data = await response.text(); // Default to text
         }
-    }
 
-    // Update additional UI components
-    updatePreviewTab(parsedResponseData);
-    updateFilterFieldOptions(parsedResponseData);
-    addToHistory(method, urlObj.toString(), response.status, responseTime);
+        // Update UI with response data
+        const status = document.getElementById('status');
+        const responseTime = document.getElementById('response-time');
+        const responseSize = document.getElementById('response-size');
+        const responseData = document.getElementById('response-data');
+        const headersTableBody = document.querySelector('#response-headers-table tbody');
 
-    // Show appropriate notification
-    if (!response.ok) {
-        showNotification(`Request failed: ${response.status} ${response.statusText}`, 'error');
-    } else {
-        showNotification('Request completed successfully', 'success');
+        if (status) status.textContent = response.status;
+        if (responseTime) responseTime.textContent = Date.now() - startTime;
+        if (responseSize && data) {
+            const size = (new TextEncoder().encode(JSON.stringify(data)).length / 1024).toFixed(2);
+            responseSize.textContent = size;
+        }
+        if (responseData) {
+            if (typeof data === 'object') {
+                responseData.textContent = JSON.stringify(data, null, 2);
+            } else {
+                responseData.textContent = data;
+            }
+        }
+
+        if (headersTableBody) {
+            headersTableBody.innerHTML = ''; // Clear existing headers
+            response.headers.forEach((value, key) => {
+                const row = document.createElement('tr');
+                row.innerHTML = `<td>${escapeHtml(key)}</td><td>${escapeHtml(value)}</td>`;
+                headersTableBody.appendChild(row);
+            });
+        } else {
+            console.error('Response headers table body not found');
+        }
+
+        // Store response in global state for filters and preview
+        window.appState.lastResponse = data;
+
+        // Update filter fields with the new data
+        try {
+            if (typeof window.updateFilterFieldOptions === 'function') {
+                window.updateFilterFieldOptions(data);
+                console.log('Updated filter fields with new data structure');
+                // Ensure response area is updated as filter UI expects
+                if (typeof window.setFilterData === 'function') {
+                    window.setFilterData(data);
+                }
+                if (typeof window.applyAllFilters === 'function') {
+                    window.applyAllFilters();
+                }
+            } else {
+                import('../ui/filters.js').then(module => {
+                    if (module.updateFilterFieldOptions) {
+                        window.updateFilterFieldOptions = module.updateFilterFieldOptions;
+                        module.updateFilterFieldOptions(data);
+                        if (typeof window.setFilterData === 'function') {
+                            window.setFilterData(data);
+                        }
+                        if (typeof window.applyAllFilters === 'function') {
+                            window.applyAllFilters();
+                        }
+                        console.log('Filter fields updated dynamically');
+                    }
+                }).catch(err => console.error('Error importing filters module:', err));
+            }
+        } catch (error) {
+            console.error('Error updating filter fields:', error);
+        }
+
+        // Use smart filters if available
+        try {
+            if (typeof window.setSmartFilterData === 'function') {
+                window.setSmartFilterData(data);
+                console.log('Smart filter data analysis started');
+            } else {
+                // Dynamically import smart filters
+                import('../ui/smartFilters.js').then(module => {
+                    if (module.setSmartFilterData) {
+                        window.setSmartFilterData = module.setSmartFilterData;
+                        module.setSmartFilterData(data);
+                        console.log('Smart filter module loaded and analysis started');
+                    }
+                }).catch(err => console.error('Error importing smart filters:', err));
+            }
+        } catch (error) {
+            console.error('Error setting smart filter data:', error);
+        }
+
+        // Update preview if needed
+        try {
+            if (typeof window.updatePreview === 'function') {
+                window.updatePreview(data);
+            }
+        } catch (error) {
+            console.error('Error updating preview:', error);
+        }
+
+        // Store the response in history with all required fields
+        const historyEntry = {
+            id: Date.now(),
+            timestamp: new Date().toISOString(),
+            method,
+            url: urlObj.toString(),
+            status: response.status,
+            time: Date.now() - startTime,
+            responseSize: (new TextEncoder().encode(JSON.stringify(data)).length / 1024).toFixed(2),
+            request: {
+                headers: finalHeaders,
+                body: body || null
+            },
+            response: {
+                headers: Object.fromEntries(response.headers.entries()),
+                body: data
+            }
+        };
+
+        // Save to localStorage
+        const historyData = JSON.parse(localStorage.getItem('requestHistory')) || [];
+        historyData.push(historyEntry);
+        localStorage.setItem('requestHistory', JSON.stringify(historyData));
+
+    } catch (error) {
+        console.error('Error handling response:', error);
+        showNotification('Error processing response: ' + error.message, 'error');
     }
 }
 
